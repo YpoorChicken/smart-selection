@@ -1,0 +1,25 @@
+### 上下文管理
+进度文件已在设计阶段创建，不要重建，只更新：
+- task_plan.md：当前任务的目标和步骤
+- progress.md：已完成和未完成的工作
+- decisions.md：重要的设计决策和理由
+
+每次开始新对话前，AI 先读这些文件了解进度。
+每次完成主要工作后，更新 progress.md 的当前阶段部分（不删历史记录）。
+
+### Skill 目录
+本项目有以下可复用的 Skill 文件：
+- .cursor/rules/llm-client-skill.md：LLM 调用客户端生成模板（从 05 项目提取）
+- .cursor/rules/crud-routes-skill.md：CRUD 路由生成模板（从 05 项目提取）
+- .cursor/rules/review-checklist.md：代码审查清单（从 05 项目提取）
+- .cursor/rules/taste-skill/SKILL.md：前端审美规范（间距 8px 网格、系统字体栈、配色克制）
+- .cursor/rules/vercel-agent-skills/web-design-guidelines.md：前端 UI 审查规则
+
+### 使用方式
+1. 新建数据库模型 → 参考 data-model-skill.md（字段照 SDD 填）
+2. 生成后端 CRUD 接口 → 参考 crud-routes-skill.md
+3. 生成 LLM 调用代码 → 参考 llm-client-skill.md
+4. 生成前端页面 → 先读 docs/DESIGN.md + docs/INTERACTION.md + 对应原型图，再按 taste-skill 写
+5. AI 生成代码后 → 用 review-checklist.md 审查，再 commit
+6. 写前端页面时 → 遵守 taste-skill 的间距体系（8px 网格）、排版规则、
+   色彩控制（配色克制、语义色明确）、动效规范（hover 反馈）

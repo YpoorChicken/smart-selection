@@ -1,0 +1,29 @@
+# 环境变量与密钥
+.env
+.env.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / 前端
+node_modules/
+frontend/dist/
+*.local
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 数据库 / 日志
+*.db
+*.sqlite3
+*.log
