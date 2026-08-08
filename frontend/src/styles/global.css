@@ -1,0 +1,106 @@
+:root {
+  /* Element Plus 主色对齐 DESIGN */
+  --el-color-primary: #4f46e5;
+  --el-color-primary-light-3: #818cf8;
+  --el-color-primary-light-5: #a5b4fc;
+  --el-color-primary-light-7: #c7d2fe;
+  --el-color-primary-light-8: #ddd6fe;
+  --el-color-primary-light-9: #eef2ff;
+  --el-color-primary-dark-2: #4338ca;
+
+  /* Brand */
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-active: #3730a3;
+  --color-primary-subtle: #eef2ff;
+  --color-on-primary: #ffffff;
+
+  /* Neutral */
+  --color-ink: #111827;
+  --color-ink-secondary: #374151;
+  --color-ink-muted: #6b7280;
+  --color-ink-disabled: #9ca3af;
+  --color-canvas: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f9fafb;
+  --color-hairline: #e5e7eb;
+  --color-hairline-strong: #d1d5db;
+
+  /* Semantic */
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #2563eb;
+
+  /* Sidebar（任务指定 240px / #1E293B） */
+  --color-sidebar: #1e293b;
+  --color-sidebar-hover: #273449;
+  --color-sidebar-text: #d1d5db;
+  --color-sidebar-text-active: #eef2ff;
+  --sidebar-width: 240px;
+  --header-height: 56px;
+
+  /* Radius / elevation */
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --shadow-raised: 0 4px 12px rgba(17, 24, 39, 0.08);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+.page-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+}
+
+.page-title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.2px;
+  color: var(--color-ink);
+}
+
+.page-muted {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 14px;
+}

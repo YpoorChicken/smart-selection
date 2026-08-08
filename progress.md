@@ -19,8 +19,30 @@
 
 ## 前端实现进度
 
+- [x] Vite + Vue 3 + TypeScript 工程初始化（Element Plus / Pinia / Vue Router / Axios / ECharts）
+- [x] AppShell 全局布局（240px 深色侧栏 + 56px 顶栏 + 内容区白卡片）
+- [x] 登录/注册页（居中卡片 + Tab）+ axios 拦截器 + 路由守卫
+- [x] 七个业务页占位路由：看板 / 商品 / 趋势 / 选品 / 竞品 / Listing / 库存
 - [x] `ScoreRing.vue` — 蓝海指数圆环（对齐 COMPONENT-SPEC）
 - [x] `ProductScoreCard.vue` — 商品评分卡片（商品名 / 价格 / 评分 / 蓝海指数）
+- [x] **商品管理页**（`ProductsView.vue`）：按 `02-products-collection.png` 完成层级品类树（父类含子类商品、递归商品数、过滤 / 跨平台近义合并）、商品表（所属品类 / 最近同步 / 搜索 / 平台 / 排序 / 分页）、采集配置抽屉、同步操作与价格历史 ECharts 弹窗；三态齐全
+
+## 后端实现进度
+
+- [x] FastAPI 应用骨架与 `routers/services/models/schema/utils` 分层
+- [x] User、PlatformCredential、Category、Product、ProductHistory ORM 模型
+- [x] SQLite / PostgreSQL 动态数据库配置与启动 fail-fast 校验
+- [x] JWT 登录、bcrypt 密码哈希、初始管理员幂等初始化
+- [x] CORS、统一异常响应、请求/脱敏 SQL 日志、登录防爆破
+- [x] Swagger 登录持久化、`/health` 与 `/ready` 探针
+- [x] 数据源接入层（`DataSource` 抽象 + Mock / FakeStore + 工厂切换）
+- [x] Amazon SP-API 数据源（LWA Token 缓存 + Catalog Items；缺凭据回落 Mock）
+- [x] Shopee Open Platform 数据源（HMAC 签名 + Token 4h 缓存 + 商品归一化；缺凭据回落 Mock）
+- [x] 登录认证整合 Redis（远程 `192.168.200.180:6379`：防爆破计数/锁定 + 会话用户缓存）
+- [x] 商品同步服务 ProductSyncService + `/api/v1/sync/*`
+- [x] 商品/品类查询：`GET /products`、`/products/{id}`、`/products/{id}/history`、`/categories`
+- [ ] 为本轮模型生成 Alembic 初始迁移（进入生产部署前）
+
 
 ## 设计评审遗留
 
