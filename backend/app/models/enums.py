@@ -43,3 +43,11 @@ class SyncStatus(str, enum.Enum):
     running = "running"
     success = "success"
     failed = "failed"
+
+
+class TrendVerdict(str, enum.Enum):
+    """市场趋势 AI 结论（SDD 附录 A）。"""
+
+    growing = "growing"
+    shrinking = "shrinking"
+    stable = "stable"

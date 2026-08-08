@@ -592,17 +592,30 @@ workers ──► services（复用同一领域逻辑）
 | 方法 | 路径 | 说明 | 角色 |
 |------|------|------|------|
 | GET | `/dashboard/summary` | KPI：趋势摘要、选品进度、竞品动态数、未读告警；默认近 7 天 | 全角色读 |
+| GET | `/dashboard/market-overview` | 市场概览聚合：品类总数、商品总数、最快增长品类、最竞争品类、价格趋势、季节性洞察；可筛 `platform_id` / `days` | 全角色读 |
 | GET | `/dashboard/category-growth` | 品类增长率 Top N | 全角色读 |
 | GET | `/inventory/risks` | 库存风险列表 | 运营+ |
 | GET | `/inventory/summary` | 库存预警摘要（P1 Should） | 全角色读 |
 | GET | `/health` | 存活探测（Docker） | 公开 |
 | GET | `/ready` | 依赖就绪（DB/Redis） | 公开 |
 
+#### `GET /dashboard/market-overview` 响应约定
+
+| 字段 | 说明 |
+|------|------|
+| `category_total` | 品类总数（可按平台过滤） |
+| `product_total` | 商品总数（可按平台过滤） |
+| `fastest_growing_category` | 时间窗内最新月度 `growth_rate` 最高的品类；无趋势数据时为 `null` |
+| `most_competitive_category` | 竞争强度最高品类：`product_count × (1 + avg_review_count)`；无商品时为 `null` |
+| `price_trend` | 近 12 个月全市场月均价曲线（优先 `category_trends`，回退 `product_histories`） |
+| `seasonality_insights` | 具备明确季节性提示的品类列表（过滤“数据不足/无明显季节性”） |
+| `generated_at` | 服务端聚合时间（UTC） |
+
 ### 3.7 前端路由 ↔ API 映射（速查）
 
 | 页面 | 主要 API |
 |------|----------|
-| `/` Dashboard | `GET /dashboard/*` · `GET /alerts/unread-count` · `GET /recommendations/stats` |
+| `/` Dashboard | `GET /dashboard/market-overview` · `GET /dashboard/*` · `GET /alerts/unread-count` · `GET /recommendations/stats` |
 | `/products` | `GET /products` · `GET/POST /collection-tasks*` |
 | `/trends` | `GET /trends` · `GET /trends/{id}/insight` |
 | `/recommendations` | `GET/POST /recommendations*` |

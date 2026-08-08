@@ -67,8 +67,10 @@ class Settings(BaseSettings):
     shopee_partner_key: str = ""
     shopee_shop_id: str = ""
 
-    # —— LLM（预留）——
-    llm_mode: str = "mock"
+    # —— LLM（OpenAI 兼容接口，支持阿里云百炼千问 / DeepSeek / OpenAI）——
+    llm_mode: Literal["mock", "openai"] = "mock"
+    llm_model: str = ""
+    dashscope_api_key: str = ""
     deepseek_api_key: str = ""
     openai_api_key: str = ""
     openai_base_url: str = ""
@@ -96,6 +98,13 @@ class Settings(BaseSettings):
     @field_validator("data_source", mode="before")
     @classmethod
     def normalize_data_source(cls, v: object) -> str:
+        if v is None or v == "":
+            return "mock"
+        return str(v).strip().lower()
+
+    @field_validator("llm_mode", mode="before")
+    @classmethod
+    def normalize_llm_mode(cls, v: object) -> str:
         if v is None or v == "":
             return "mock"
         return str(v).strip().lower()

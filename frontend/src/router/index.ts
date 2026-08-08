@@ -30,7 +30,7 @@ const routes: RouteRecordRaw[] = [
         path: 'trends',
         name: 'trends',
         component: () => import('@/views/TrendsView.vue'),
-        meta: { title: '市场趋势', breadcrumb: ['市场趋势'] },
+        meta: { title: '市场趋势', breadcrumb: ['选品分析', '市场趋势'] },
       },
       {
         path: 'selections',

@@ -13,6 +13,7 @@ from app.database import Base
 from app.models.enums import Platform
 
 if TYPE_CHECKING:
+    from app.models.category_trend import CategoryTrend
     from app.models.product import Product
 
 
@@ -68,4 +69,10 @@ class Category(Base):
         "Product",
         back_populates="category",
         passive_deletes=True,
+    )
+    category_trends: Mapped[list[CategoryTrend]] = relationship(
+        "CategoryTrend",
+        back_populates="category",
+        passive_deletes=True,
+        order_by="CategoryTrend.period_month.desc()",
     )

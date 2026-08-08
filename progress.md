@@ -26,6 +26,7 @@
 - [x] `ScoreRing.vue` — 蓝海指数圆环（对齐 COMPONENT-SPEC）
 - [x] `ProductScoreCard.vue` — 商品评分卡片（商品名 / 价格 / 评分 / 蓝海指数）
 - [x] **商品管理页**（`ProductsView.vue`）：按 `02-products-collection.png` 完成层级品类树（父类含子类商品、递归商品数、过滤 / 跨平台近义合并）、商品表（所属品类 / 最近同步 / 搜索 / 平台 / 排序 / 分页）、采集配置抽屉、同步操作与价格历史 ECharts 弹窗；三态齐全
+- [x] **市场趋势页**（`TrendsView.vue` / `Trends.vue`）：按 `03-trends.png` 完成左 40% 品类趋势表 + 右 60% 价格分布柱状图 / 价格变化折线图 + AI 解读四块（摘要/亮点/推荐/风险），对接 `/trends/categories`、price-distribution、ai-report；三态与淡入齐全
 
 ## 后端实现进度
 
@@ -41,6 +42,11 @@
 - [x] 登录认证整合 Redis（远程 `192.168.200.180:6379`：防爆破计数/锁定 + 会话用户缓存）
 - [x] 商品同步服务 ProductSyncService + `/api/v1/sync/*`
 - [x] 商品/品类查询：`GET /products`、`/products/{id}`、`/products/{id}/history`、`/categories`
+- [x] 市场趋势数据模型：`CategoryTrend` / `category_trends`（严格对齐 SDD §1.2.7，含品类双向关联、月度唯一约束与 `TrendVerdict`）
+- [x] 市场趋势分析服务与 API：`TrendAnalysisService`（月度价格分位 / 环比增长 / 季节性 / 增长品类）+ `POST /api/v1/trends/calculate` + `GET /api/v1/trends/categories`
+- [x] 价格分布分析 API：`GET /api/v1/trends/categories/{id}/charts/price-distribution`（四分位区间商品数 / 平均评分 / 月度价格曲线 / 分析建议，父品类含全部子类）
+- [x] 品类趋势 AI 报告：`POST /api/v1/trends/categories/{id}/ai-report`（趋势计算 + 价格分布聚合 + 千问/OpenAI 兼容 LLM，Pydantic 约束摘要 / 亮点 / 推荐 / 风险并缓存至 `ai_insight`）
+- [x] 市场概览看板：`GET /api/v1/dashboard/market-overview`（品类/商品总数、最快增长、最竞争、价格趋势、季节性洞察；已同步 `docs/SDD.md` §3.6）
 - [ ] 为本轮模型生成 Alembic 初始迁移（进入生产部署前）
 
 
