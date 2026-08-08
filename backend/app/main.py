@@ -14,7 +14,16 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import auth, categories, dashboard, products, sync, system, trends
+from app.routers import (
+    auth,
+    categories,
+    dashboard,
+    products,
+    recommendations,
+    sync,
+    system,
+    trends,
+)
 from app.services.bootstrap import seed_initial_data
 from app.utils.logging import configure_logging, redact_query_string
 from app.utils.redis_client import close_redis, ping_redis
@@ -139,5 +148,6 @@ app.include_router(categories.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
 app.include_router(trends.router, prefix="/api/v1")
+app.include_router(recommendations.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(system.router, prefix="/api/v1")

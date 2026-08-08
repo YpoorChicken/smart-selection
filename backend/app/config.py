@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     login_max_failures: int = 5
     login_lock_minutes: int = 30
 
-    # —— Redis（登录认证缓存）——
+    # —— Redis（登录认证缓存 / ARQ 队列）——
     # 优先 REDIS_URL；否则按 HOST/PORT/DB/PASSWORD 拼接
     redis_url: str = ""
     redis_host: str = "192.168.200.180"
@@ -87,6 +87,16 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_password: str = ""
     redis_key_prefix: str = "smart-selection"
+    arq_queue_name: str = "smart-selection:arq"
+
+    # —— 选品扫描 / Webhook（预留）——
+    # 新推荐创建时 POST 到该 URL；空则仅打日志不失败
+    selection_webhook_url: str = ""
+    selection_webhook_timeout_seconds: float = 5.0
+    # 已有推荐跳过阈值：综合分相对变化超过该比例才更新/新建
+    selection_rescore_threshold: float = 0.20
+    # ARQ Cron 时区（日批 03:30）
+    arq_timezone: str = "Asia/Shanghai"
 
     @field_validator("db_type", mode="before")
     @classmethod

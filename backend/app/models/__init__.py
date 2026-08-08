@@ -6,6 +6,11 @@ from app.models.platform_credential import PlatformCredential
 from app.models.product import Product
 from app.models.product_history import ProductHistory
 from app.models.product_sync_log import ProductSyncLog
+from app.models.recommendation import (
+    ProductRecommendation,
+    Recommendation,
+    SelectionDecision,
+)
 from app.models.user import User
 
 __all__ = [
@@ -14,6 +19,9 @@ __all__ = [
     "PlatformCredential",
     "Product",
     "ProductHistory",
+    "ProductRecommendation",
     "ProductSyncLog",
+    "Recommendation",
+    "SelectionDecision",
     "User",
 ]

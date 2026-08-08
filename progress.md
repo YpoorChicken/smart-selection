@@ -47,6 +47,13 @@
 - [x] 价格分布分析 API：`GET /api/v1/trends/categories/{id}/charts/price-distribution`（四分位区间商品数 / 平均评分 / 月度价格曲线 / 分析建议，父品类含全部子类）
 - [x] 品类趋势 AI 报告：`POST /api/v1/trends/categories/{id}/ai-report`（趋势计算 + 价格分布聚合 + 千问/OpenAI 兼容 LLM，Pydantic 约束摘要 / 亮点 / 推荐 / 风险并缓存至 `ai_insight`）
 - [x] 市场概览看板：`GET /api/v1/dashboard/market-overview`（品类/商品总数、最快增长、最竞争、价格趋势、季节性洞察；已同步 `docs/SDD.md` §3.6）
+- [x] 选品推荐数据模型：`Recommendation` / `recommendations`（严格对齐 SDD §1.2.8；含四维得分、决策字段、`(status, score_total DESC)` / `category_id` 索引、`RecommendationStatus` 状态机；决策字段内嵌不单建 selection_decisions）
+- [x] 选品评分算法：`SelectionScorer`（需求 30% / 竞争 20% / 利润 25% / 趋势 25%）+ `POST /api/v1/recommendations/generate`；已回写 `docs/SDD.md` §3.3 / §4.7
+- [x] 蓝海品类发现：`GET /api/v1/recommendations/blue-ocean`（需求高×竞争低筛选，蓝海指数降序，含四维评分与推荐理由；已写入 SDD §3.3）
+- [x] 选品 AI 深度分析：`POST /api/v1/recommendations/{id}/ai-analysis`（品类市场数据 + Top5 竞品 → 市场机会/竞品格局/入局建议/风险；落库 `reason`，摘要同步 `ai_blue_ocean_text`；已回写 SDD / DD-015）
+- [x] 选品推荐管理接口：`GET /recommendations`（分页，筛 status/platform）、详情、accept/reject（409 状态冲突）、`GET /export` CSV、`GET /stats`；已回写 SDD §3.3
+- [x] 定时选品扫描：`scan_all_categories` + ARQ Cron 每日 03:30（Asia/Shanghai）+ `POST /recommendations/scan`（入队/同步）+ 分差≤20% 跳过 + webhook 预留；已回写 SDD / DD-016
+- [x] 选品推荐页（`Selections.vue`）：蓝海发现卡片网格（圆环色阶/四维条/风险标签）+ 筛选分页 + AI 分析抽屉四块 + 推荐列表/已接受 Tab；对接 blue-ocean / recommendations / ai-analysis / accept·reject
 - [ ] 为本轮模型生成 Alembic 初始迁移（进入生产部署前）
 
 

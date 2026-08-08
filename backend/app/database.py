@@ -151,3 +151,25 @@ def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _ensure_sqlite_columns()
+
+
+def _ensure_sqlite_columns() -> None:
+    """开发环境 SQLite：为已有表补齐新增可空列（create_all 不会 ALTER）。"""
+    url = str(engine.url)
+    if not url.startswith("sqlite"):
+        return
+
+    patches = (
+        ("recommendations", "reason", "TEXT"),
+    )
+    with engine.begin() as conn:
+        for table, column, col_type in patches:
+            rows = conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+            existing = {row[1] for row in rows}
+            if column in existing:
+                continue
+            conn.exec_driver_sql(
+                f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
+            )
+            logger.info("SQLite 已补齐列 %s.%s", table, column)

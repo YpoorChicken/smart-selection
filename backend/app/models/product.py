@@ -31,6 +31,7 @@ from app.models.enums import Platform
 if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.product_history import ProductHistory
+    from app.models.recommendation import Recommendation
 
 JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
@@ -112,4 +113,9 @@ class Product(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="ProductHistory.recorded_at.desc()",
+    )
+    recommendations: Mapped[list[Recommendation]] = relationship(
+        "Recommendation",
+        back_populates="product",
+        passive_deletes=True,
     )

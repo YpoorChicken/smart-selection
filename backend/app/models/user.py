@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, String, func, true
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.enums import UserRole
+
+if TYPE_CHECKING:
+    from app.models.recommendation import Recommendation
 
 
 class User(Base):
@@ -66,8 +70,12 @@ class User(Base):
         onupdate=func.now(),
     )
 
-    # 预留：后续模块外键回指时使用
-    # recommendations / listing_versions / alerts / collection_tasks 等
+    recommendation_decisions: Mapped[list[Recommendation]] = relationship(
+        "Recommendation",
+        back_populates="decider",
+        foreign_keys="Recommendation.decided_by",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email} role={self.role}>"

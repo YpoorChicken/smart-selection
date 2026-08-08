@@ -268,7 +268,8 @@ system_settings（KV 配置，如降价阈值）
 | score_competition | Numeric(5,2) | NOT NULL | 竞争强度（越高竞争越弱或按约定语义） |
 | score_margin | Numeric(5,2) | NOT NULL | 利润空间 |
 | score_trend | Numeric(5,2) | NOT NULL | 趋势方向 |
-| ai_blue_ocean_text | TEXT | | AI 蓝海说明 |
+| ai_blue_ocean_text | TEXT | | AI 蓝海摘要（可读短文，可由深度分析同步） |
+| reason | TEXT | | AI 选品深度分析（结构化 JSON：市场机会 / 竞品格局 / 入局建议 / 风险） |
 | status | ENUM | NOT NULL | `pending` / `accepted` / `rejected` |
 | decided_by | UUID | FK → users.id NULL | |
 | decided_at | TIMESTAMPTZ | | |
@@ -555,12 +556,103 @@ workers ──► services（复用同一领域逻辑）
 
 | 方法 | 路径 | 说明 | 角色 |
 |------|------|------|------|
-| GET | `/recommendations` | 列表；筛 status / category / score | 登录；决策按钮按角色 |
-| GET | `/recommendations/{id}` | 四维得分 + AI 蓝海说明 | 登录 |
-| POST | `/recommendations/{id}/accept` | 接受；写 decided_by/at | selection_manager / ops_lead |
-| POST | `/recommendations/{id}/reject` | 拒绝；可选 reason | 同上 |
-| POST | `/recommendations/generate` | 触发批量打分任务（内部/主管） | ops_lead |
+| GET | `/recommendations` | 分页列表；筛 `status` / `platform_id`（可选 `category_id` / `min_score`） | 登录；决策按钮按角色 |
+| GET | `/recommendations/export` | 按与列表相同筛选导出 CSV（UTF-8 BOM，上限 5000 行） | 登录 |
+| GET | `/recommendations/blue-ocean` | 发现蓝海品类（需求高 × 竞争低）；按蓝海指数降序；含四维评分与推荐理由 | 登录 |
+| GET | `/recommendations/{id}` | 四维得分 + AI 蓝海说明 + `reason` 深度分析 | 登录 |
+| POST | `/recommendations/{id}/ai-analysis` | 基于品类市场数据调用 LLM 生成深度分析，写入 `reason`（并同步摘要至 `ai_blue_ocean_text`） | selection_manager / ops_lead / boss |
+| POST | `/recommendations/{id}/accept` | 接受；写 decided_by/at；可选 note | selection_manager / ops_lead |
+| POST | `/recommendations/{id}/reject` | 拒绝；可选 reject_reason / note | 同上 |
+| POST | `/recommendations/generate` | 触发 `SelectionScorer` 批量打分并落库 `pending` 推荐；可筛 `platform_id` / `category_id` | ops_lead / selection_manager / boss |
+| POST | `/recommendations/scan` | 手动触发全品类选品扫描（同日批逻辑）；默认入队 ARQ，可选同步执行 | ops_lead / selection_manager / boss |
 | GET | `/recommendations/stats` | 待处理/已接受/已拒绝计数（供 P1） | 登录 |
+
+#### `GET /recommendations` 查询 / 响应
+
+| 字段 | 位置 | 说明 |
+|------|------|------|
+| `page` / `page_size` | query | 分页，默认 1 / 20，`page_size` 上限 100 |
+| `status` | query 可选 | `pending` / `accepted` / `rejected` |
+| `platform_id` | query 可选 | 经 `categories.platform` 关联筛选 |
+| `category_id` | query 可选 | 品类 UUID |
+| `min_score` | query 可选 | `score_total` 下限，0–100 |
+| `items` / `meta` | response | 分页列表（含 `category_name` / `platform_id`） |
+
+**排序：** `score_total DESC`，二级 `created_at DESC`。
+
+#### `GET /recommendations/export` 查询
+
+筛选参数与列表一致（无分页）。响应 `Content-Type: text/csv; charset=utf-8`，文件名 `recommendations.csv`。
+
+#### `POST /recommendations/{id}/accept|reject` 请求 / 响应
+
+| 字段 | 位置 | 说明 |
+|------|------|------|
+| `note` | body 可选 | 写入 `note`，最长 500 |
+| `reason` | body 可选（仅 reject） | 写入 `reject_reason`，最长 500 |
+| — | response | 更新后的 `RecommendationRead` |
+
+**状态机：** 仅 `pending` 可决策；已决策返回 **409**。非授权角色 **403**。
+
+#### `POST /recommendations/{id}/ai-analysis` 请求 / 响应
+
+| 字段 | 位置 | 说明 |
+|------|------|------|
+| `id` | path | 推荐行 UUID |
+| `analysis.market_opportunity` | response | 市场机会分析 |
+| `analysis.competitive_landscape` | response | Top 5 竞品/卖家差异化策略（`rank` / `name` / `differentiation`） |
+| `analysis.entry_advice` | response | 入局建议（定价区间与差异化方向） |
+| `analysis.risks` | response | 风险提示（1–5 条） |
+| `reason` | response | 落库原文（`SelectionAIAnalysis` 的 JSON） |
+| `generated_at` | response | 生成时间（UTC） |
+
+**输入：** 服务层聚合该推荐所属品类的市场数据（四维分、趋势分位/增速、价格分布摘要、按评论量排序的 Top 5 商品作为竞品代表）。  
+**落库：** `recommendations.reason` ← 结构化 JSON；`ai_blue_ocean_text` ← 由分析摘要拼接的可读短文。  
+**模式：** 复用 `LLMClient`（`LLM_MODE=mock|openai`）；无 Key 时 mock 回落。
+
+#### `GET /recommendations/blue-ocean` 查询 / 响应
+
+| 字段 | 位置 | 说明 |
+|------|------|------|
+| `platform_id` | query 可选 | 平台筛选 |
+| `min_demand` | query 可选 | 市场需求分下限，默认 60 |
+| `min_competition` | query 可选 | 竞争机会分下限（分高=竞争弱），默认 60 |
+| `limit` | query 可选 | 返回条数，默认 20，上限 100 |
+| `items[].blue_ocean_index` | response | 蓝海指数（= `score_total`，0–100） |
+| `items[].scores` | response | 四维评分详情：demand / competition / margin / trend |
+| `items[].reason` | response | 规则化推荐理由（需求高 + 竞争低的可读说明） |
+
+**筛选语义：** `score_demand >= min_demand` 且 `score_competition >= min_competition`（竞争维度为机会分）。  
+**排序：** `blue_ocean_index DESC`。
+
+#### `POST /recommendations/generate` 请求 / 响应
+
+| 字段 | 位置 | 说明 |
+|------|------|------|
+| `platform_id` | body 可选 | 仅对该平台下品类打分 |
+| `category_id` | body 可选 | 仅打分单个品类（含其全部子品类商品样本） |
+| `limit` | body 可选 | 本批最多写入条数，默认 50，上限 200 |
+| `items` | response | 新生成 / 更新的推荐列表（含四维分与综合分） |
+| `generated_count` | response | 成功写入条数 |
+
+#### `POST /recommendations/scan` 请求 / 响应
+
+| 字段 | 位置 | 说明 |
+|------|------|------|
+| `sync` | body 可选 | `true` 时进程内同步执行（联调/无 Worker）；默认 `false` 入队 ARQ |
+| `platform_id` | body 可选 | 仅扫描该平台活跃品类 |
+| `mode` | response | `queued` / `sync` |
+| `job_id` | response | 入队时的 ARQ job id；同步时为 null |
+| `scanned` / `created` / `updated` / `skipped` / `errors` | response | 同步模式统计；入队模式可为 null |
+
+**扫描语义（`scan_all_categories`）：**
+1. 活跃品类 = 至少有一件商品的品类（可按 `platform_id` 收窄）。
+2. 对每个品类跑 `SelectionScorer`；取该品类**最新一条**推荐（优先 `pending`）作基线。
+3. **已有推荐且综合分相对变化 ≤ 20%** → 跳过，不重复生成。
+4. 无推荐，或相对变化 **> 20%** → 写入/更新 `pending`（已决策品类在分数跳变时新建一条 `pending`）。
+5. **新创建**的推荐触发 webhook 预留通知（`SELECTION_WEBHOOK_URL` 未配置则仅打日志，不失败）。
+
+**日批：** Redis + ARQ Cron，每天 **03:30（Asia/Shanghai）** 执行同一任务；Redis 锁 `lock:selection:scan` 防并发。
 
 ### 3.4 模块四 — 竞品监控与预警
 
@@ -618,7 +710,7 @@ workers ──► services（复用同一领域逻辑）
 | `/` Dashboard | `GET /dashboard/market-overview` · `GET /dashboard/*` · `GET /alerts/unread-count` · `GET /recommendations/stats` |
 | `/products` | `GET /products` · `GET/POST /collection-tasks*` |
 | `/trends` | `GET /trends` · `GET /trends/{id}/insight` |
-| `/recommendations` | `GET/POST /recommendations*` |
+| `/recommendations` | `GET /recommendations` · `/export` · `/stats` · `/blue-ocean` · `POST /generate` · `/scan` · `/{id}` · accept/reject · ai-analysis |
 | `/competitors` | `GET/POST/DELETE /competitors*` |
 | `/listing` | `POST .../generate` · `POST .../adopt` · `GET .../compare` |
 | `/inventory-alerts` | `GET /alerts` · `POST /alerts/{id}/read` · `GET /inventory/risks` |
@@ -752,20 +844,24 @@ GET /trends/{category_id}/insight
 
 ### 4.7 评分算法（模块三 · 逻辑契约）
 
-综合分默认等权（Could：主管自定义权重后重算）：
+实现类：`SelectionScorer`（`app/services/selection_scorer.py`）。  
+各维度满分 100，加权汇总为综合分（Could：主管自定义权重后重算）：
 
 ```
-score_total = 0.25*demand + 0.25*competition + 0.25*margin + 0.25*trend
+score_total = 0.30*demand + 0.20*competition + 0.25*margin + 0.25*trend
 ```
 
-| 维度 | 主要输入 | 方向约定 |
-|------|----------|----------|
-| demand | 品类搜索热度代理：评论增量、BSR 分布 | 越高越好 |
-| competition | 卖家密度、头部评分集中度 | 映射为「机会分」：竞争弱 → 分高 |
-| margin | 价格带中位 − 预估成本代理（MVP 可用品类价差） | 越高越好 |
-| trend | `category_trends.growth_rate` + 季节性 | 增长为正 |
+| 维度 | 权重 | 主要输入 | 方向约定 |
+|------|------|----------|----------|
+| demand（市场需求） | 30% | 月搜索量代理（评论总量 / `sample_size`）+ `category_trends.growth_rate` | 越高越好 |
+| competition（竞争强度） | 20% | 同类商品数量、评分分布（≥4.5 头部占比） | **机会分**：竞争越小 → 分越高 |
+| margin（利润空间） | 25% | 平均售价 − 平均成本估算（MVP：成本 = 均价 × 55% 或参考 `price_p25`） | 毛利率越高越好 |
+| trend（趋势方向） | 25% | 价格趋势（历史月均价斜率）+ 销量代理（评论增量）+ `growth_rate` | 上升趋势得分高 |
 
-AI 蓝海文案在分数落库后异步生成，写入 `ai_blue_ocean_text`；列表接口不阻塞等待 OpenAI。
+**归一化：** 各维度先算原始信号，再钳制到 `[0, 100]`，`score_total` 保留两位小数。  
+**落库：** `POST /recommendations/generate` 调用 Scorer → 幂等更新同品类 `pending` 行（无则 INSERT）→ 返回结果。  
+**蓝海发现：** `GET /recommendations/blue-ocean` 实时调用 `SelectionScorer`，筛「需求高 + 竞争机会高」品类，按蓝海指数（`score_total`）降序返回评分详情与推荐理由。  
+AI 选品深度分析由 `POST /recommendations/{id}/ai-analysis` 同步触发（MVP），写入 `reason`，并同步摘要到 `ai_blue_ocean_text`。批量打分接口不阻塞等待 LLM。
 
 ---
 
@@ -785,6 +881,7 @@ AI 蓝海文案在分数落库后异步生成，写入 `ai_blue_ocean_text`；�
 | `trends:insight:{category_id}` | 24h | AI 解读 |
 | `lock:collection:{task_id}` | 任务时长 | 防重复跑 |
 | `lock:competitor:snap` | 短 | 快照互斥 |
+| `lock:selection:scan` | 3600s | 全品类选品扫描互斥 |
 
 ### 5.3 异步任务
 
@@ -793,16 +890,19 @@ AI 蓝海文案在分数落库后异步生成，写入 `ai_blue_ocean_text`；�
 | 品类采集 | 定时 / 手动 | 完成率 > 95%（PRD） |
 | 竞品快照 | 每小时 | 告警延迟 < 30min |
 | 趋势月算 | 每日 | 写入 category_trends |
-| 选品打分 | 主管触发 / 日批 | 产出 pending 推荐 |
+| 选品全量扫描 | 每日 03:30（ARQ Cron）/ `POST /recommendations/scan` | 活跃品类评分完成；跳过分差≤20% 的已有推荐；新推荐可 webhook |
+| 选品打分（小批量） | `POST /recommendations/generate` | 产出 pending 推荐 |
 | Listing 生成 | 用户点击 | 超时不落残缺稿 |
+
+**Worker：** `arq app.workers.settings.WorkerSettings`（依赖 Redis）。  
+**Webhook（预留）：** `POST {SELECTION_WEBHOOK_URL}`，事件 `recommendation.created`；未配置 URL 时 no-op。
 
 ### 5.4 Docker 部署（模块六）
 
 ```
 services:
   api          # FastAPI uvicorn
-  worker       # Celery/RQ
-  beat         # 定时
+  worker       # ARQ worker（含 Cron 日批选品扫描）
   db           # PostgreSQL
   redis        # Redis
   web          # Nginx + Vue 静态（可选同栈）

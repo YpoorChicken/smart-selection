@@ -165,8 +165,60 @@ MVP 只交付浅色内容区 + 深色侧栏；不做深色内容主题、不做�
 
 ---
 
+## DD-014 · 选品四维权重调整为 30/20/25/25
+
+**决策：**  
+`SelectionScorer` 综合分权重采用：市场需求 30%、竞争强度 20%、利润空间 25%、趋势方向 25%（覆盖原 SDD 等权 0.25）。由 `POST /recommendations/generate` 触发批量打分。
+
+**理由：**  
+市场需求对蓝海判断更前置；竞争维度以「机会分」表达，权重略降避免与需求信号重复放大。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §4.7）
+
+---
+
+## DD-013 · 选品推荐与决策共用 `recommendations` 单表
+
+**决策：**  
+不拆分 `product_recommendations` 与 `selection_decisions` 两张表；严格按 SDD §1.2.8 使用单表 `recommendations`。打分字段（`score_*` / `ai_blue_ocean_text`）与决策字段（`status` / `decided_by` / `decided_at` / `reject_reason` / `note`）同存一行。ORM 类名 `Recommendation`，并以别名 `ProductRecommendation` / `SelectionDecision` 兼容业务用语。
+
+**理由：**  
+SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:1 同步与多余 JOIN，且无文档依据。
+
+**状态：** 已采纳（2026-08-08）
+
+---
+
+## DD-015 · AI 选品深度分析落库 `recommendations.reason`
+
+**决策：**  
+新增 `POST /recommendations/{id}/ai-analysis`；LLM 输出四段结构（市场机会 / Top5 竞品差异化 / 入局建议 / 风险），JSON 写入 `reason`，可读摘要同步 `ai_blue_ocean_text`。无独立卖家字段时以评论量 Top 商品代理竞品代表。
+
+**理由：**  
+任务用语 `ProductRecommendation.reason` 与蓝海列表响应里的规则化 `reason` 区分：前者为持久化深度分析；列表接口 `reason` 仍为规则文案。`ai_blue_ocean_text` 保留给抽屉短文展示。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §1.2.8 / §3.3 / §4.7）
+
+---
+
+## DD-016 · 日批选品扫描用 Redis + ARQ，跳过阈值 20%
+
+**决策：**  
+全品类扫描 `scan_all_categories` 由 ARQ Cron 每天 03:30（Asia/Shanghai）执行；手动 `POST /recommendations/scan` 默认入队同一任务。已有推荐且综合分相对变化 ≤ 20% 跳过；新创建推荐走 `WebhookNotifier` 预留回调（无 URL 则 no-op）。
+
+**理由：**  
+与 CLAUDE 技术栈「Redis + ARQ」一致；跳过阈值避免日批噪声；webhook 先预留契约便于后续对接企业微信/飞书。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §3.3 / §5.3）
+
+---
+
 ## 变更日志
 
 | 日期 | 说明 |
 |------|------|
 | 2026-08-02 | 初版：随 `docs/DESIGN.md` v1.0 定稿写入 DD-001～DD-012 |
+| 2026-08-08 | 新增 DD-013：选品推荐单表建模 |
+| 2026-08-08 | 新增 DD-014：选品权重 30/20/25/25 与 generate API |
+| 2026-08-08 | 新增 DD-015：选品 AI 深度分析 API 与 `reason` 字段 |
+| 2026-08-08 | 新增 DD-016：ARQ 日批选品扫描与 webhook 预留 |

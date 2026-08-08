@@ -51,3 +51,11 @@ class TrendVerdict(str, enum.Enum):
     growing = "growing"
     shrinking = "shrinking"
     stable = "stable"
+
+
+class RecommendationStatus(str, enum.Enum):
+    """选品推荐状态（SDD 附录 A / §1.2.8）。"""
+
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
