@@ -15,8 +15,10 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.database import init_db
 from app.routers import (
+    alerts,
     auth,
     categories,
+    competitors,
     dashboard,
     products,
     recommendations,
@@ -149,5 +151,7 @@ app.include_router(products.router, prefix="/api/v1")
 app.include_router(sync.router, prefix="/api/v1")
 app.include_router(trends.router, prefix="/api/v1")
 app.include_router(recommendations.router, prefix="/api/v1")
+app.include_router(competitors.router, prefix="/api/v1")
+app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(system.router, prefix="/api/v1")

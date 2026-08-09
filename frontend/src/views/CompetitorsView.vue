@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import PagePlaceholder from '@/components/PagePlaceholder.vue'
+/** 兼容路由；页面实现见 Competitors.vue */
+import Competitors from './Competitors.vue'
 </script>
 
 <template>
-  <PagePlaceholder
-    title="竞品监控"
-    description="竞品价格与排名变化告警将在此展示。"
-  />
+  <Competitors />
 </template>

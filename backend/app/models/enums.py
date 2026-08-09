@@ -59,3 +59,25 @@ class RecommendationStatus(str, enum.Enum):
     pending = "pending"
     accepted = "accepted"
     rejected = "rejected"
+
+
+class AlertType(str, enum.Enum):
+    """告警类型（SDD 附录 A / §1.2.11）。"""
+
+    competitor_price_drop = "competitor_price_drop"
+    competitor_rating_drop = "competitor_rating_drop"
+    competitor_discovered = "competitor_discovered"
+    inventory_low = "inventory_low"
+    collection_failed = "collection_failed"
+
+
+class AlertSeverity(str, enum.Enum):
+    """
+    告警严重级别（SDD 附录 A）。
+
+    业务口语映射：low→info / medium→warning / high→critical。
+    """
+
+    info = "info"
+    warning = "warning"
+    critical = "critical"

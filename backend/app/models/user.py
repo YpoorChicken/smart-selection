@@ -13,7 +13,11 @@ from app.database import Base
 from app.models.enums import UserRole
 
 if TYPE_CHECKING:
+    from app.models.alert import Alert
+    from app.models.competitor_binding import CompetitorBinding
     from app.models.recommendation import Recommendation
+    from app.models.system_setting import SystemSetting
+    from app.models.watched_product import WatchedProduct
 
 
 class User(Base):
@@ -74,6 +78,30 @@ class User(Base):
         "Recommendation",
         back_populates="decider",
         foreign_keys="Recommendation.decided_by",
+        passive_deletes=True,
+    )
+    watched_products: Mapped[list[WatchedProduct]] = relationship(
+        "WatchedProduct",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    competitor_bindings_created: Mapped[list[CompetitorBinding]] = relationship(
+        "CompetitorBinding",
+        back_populates="creator",
+        foreign_keys="CompetitorBinding.created_by",
+        passive_deletes=True,
+    )
+    alerts_read: Mapped[list[Alert]] = relationship(
+        "Alert",
+        back_populates="reader",
+        foreign_keys="Alert.read_by",
+        passive_deletes=True,
+    )
+    system_settings_updated: Mapped[list[SystemSetting]] = relationship(
+        "SystemSetting",
+        back_populates="updater",
+        foreign_keys="SystemSetting.updated_by",
         passive_deletes=True,
     )
 

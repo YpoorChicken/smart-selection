@@ -320,8 +320,8 @@ system_settings（KV 配置，如降价阈值）
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | UUID | PK | |
-| type | ENUM | NOT NULL | `competitor_price_drop` / `inventory_low` / `collection_failed` 等 |
-| severity | ENUM | DEFAULT 'warning' | `info` / `warning` / `critical` |
+| type | ENUM | NOT NULL | `competitor_price_drop` / `competitor_rating_drop` / `competitor_discovered` / `inventory_low` / `collection_failed` |
+| severity | ENUM | DEFAULT 'warning' | `info` / `warning` / `critical`（业务口语 low/medium/high 分别对应三者） |
 | product_id | UUID | FK → products.id NULL | |
 | competitor_binding_id | UUID | FK NULL | |
 | threshold_value | Numeric(8,4) | | 如 0.05 = 5% |
@@ -336,6 +336,15 @@ system_settings（KV 配置，如降价阈值）
 
 **索引：** `(is_read, triggered_at DESC)`、`(product_id)`。  
 **未读计数：** 单一数据源 `COUNT(*) WHERE is_read = false`，供看板 KPI 与侧栏角标共用（DESIGN-SIGNOFF §5）。
+
+**竞品监控告警规则（价格监控 / 自动告警）：**
+
+| 条件 | severity | type | 说明 |
+|------|----------|------|------|
+| 竞品降价超 5%（`Δ% ≤ -0.05`） | `warning`（medium） | `competitor_price_drop` | 阈值可由 `alert.price_drop_threshold` 覆盖，默认 0.05 |
+| 竞品降价超 10%（`Δ% ≤ -0.10`） | `critical`（high） | `competitor_price_drop` | 高优先级覆盖 medium |
+| 评分下降超 0.5 | `warning`（medium） | `competitor_rating_drop` | 相对上一快照评分 |
+| 新发现 Top 10 竞品并自动绑定 | `info`（low） | `competitor_discovered` | 发现流程写入；每条绑定一条 |
 
 ---
 
@@ -658,15 +667,38 @@ workers ──► services（复用同一领域逻辑）
 
 | 方法 | 路径 | 说明 | 角色 |
 |------|------|------|------|
-| GET | `/competitors` | 某自营商品下已绑定竞品列表 | 运营 |
+| GET | `/competitors` | 某自营商品下已绑定竞品列表（`own_product_id` 可选） | 运营 |
 | POST | `/competitors` | 添加绑定 `{ own_product_id, competitor_product_id }` | 运营 |
 | DELETE | `/competitors/{binding_id}` | 移除监控（soft） | 运营 |
+| GET | `/competitors/{binding_id}` | 竞品详情（绑定 + 双方商品 + 最近快照） | 运营 |
 | GET | `/competitors/{binding_id}/snapshots` | 价格/评分历史 | 运营 |
-| GET | `/competitors/discover` | 自动发现候选（Could） | 运营 |
-| GET | `/alerts` | 告警列表；筛 unread / type / time | 运营+ |
+| GET | `/competitors/discover` | AI 自动发现竞品并创建绑定（Could；`product_id` 必填） | 运营 |
+| GET | `/competitors/{product_id}/report` | 竞品分析报告：价格区间 / 排名位置 / 价格趋势 / 洞察 | 运营+ |
+| POST | `/competitors/{binding_id}/refresh` | 更新单个活跃竞品最新价/评分并写快照 | 运营 |
+| POST | `/competitors/batch-update` | 更新所有活跃竞品数据（快照 + 降价告警评估） | 运营 |
+| GET | `/alerts` | 告警列表；筛 `is_read` / `type` / `severity` / 时间窗 | 运营+ |
 | POST | `/alerts/{id}/read` | 标记已读 | 运营 / ops_lead |
 | GET | `/alerts/unread-count` | 未读总数（看板 + 角标） | 登录 |
+| GET | `/alerts/stats` | 告警统计：未读/已读、按 type/severity 分布 | 登录 |
+| POST | `/alerts/check` | 手动触发价格监控检查（刷新活跃竞品 + 评估告警） | 运营 / ops_lead |
 | GET/PATCH | `/settings/alert-threshold` | 降价阈值读写 | GET 登录；PATCH ops_lead |
+
+#### `GET /competitors/{product_id}/report` 响应约定
+
+对自营商品 `product_id` 生成竞品分析报告。对比集 = **自身 + 活跃绑定竞品**；若无绑定则回落同品类 Top N（按评论量）。
+
+| 字段 | 说明 |
+|------|------|
+| `product` | 自营商品摘要 |
+| `peer_count` | 对比集规模（含自身） |
+| `price_range` | `min` / `max` / `avg` / `median` / `p25` / `p75`（仅含有价格的成员） |
+| `position` | 你的位置：`price_rank`（1=最便宜）、`rating_rank`（1=评分最高）、`review_count_rank`（1=评论最多）；附 `total` |
+| `price_trend` | 近 `days`（默认 30）日序列：`date` / `own_price` / `competitor_avg_price` |
+| `insights` | 分析洞察：`summary` / `highlights` / `recommendations` / `risks`（LLM，失败回落启发式） |
+| `peers` | 对比集成员简表（id / title / price / rating / review_count / is_self） |
+| `generated_at` | 生成时间（UTC） |
+
+**查询参数：** `days`（7–90，默认 30）、`use_ai`（默认 true）。
 
 ### 3.5 模块五 — AI Listing 优化
 
@@ -685,6 +717,7 @@ workers ──► services（复用同一领域逻辑）
 |------|------|------|------|
 | GET | `/dashboard/summary` | KPI：趋势摘要、选品进度、竞品动态数、未读告警；默认近 7 天 | 全角色读 |
 | GET | `/dashboard/market-overview` | 市场概览聚合：品类总数、商品总数、最快增长品类、最竞争品类、价格趋势、季节性洞察；可筛 `platform_id` / `days` | 全角色读 |
+| GET | `/dashboard/competition` | 竞品监控看板：监控总数、今日告警、今日价格变动、Top 变动、一句话摘要 | 全角色读 |
 | GET | `/dashboard/category-growth` | 品类增长率 Top N | 全角色读 |
 | GET | `/inventory/risks` | 库存风险列表 | 运营+ |
 | GET | `/inventory/summary` | 库存预警摘要（P1 Should） | 全角色读 |
@@ -703,15 +736,28 @@ workers ──► services（复用同一领域逻辑）
 | `seasonality_insights` | 具备明确季节性提示的品类列表（过滤“数据不足/无明显季节性”） |
 | `generated_at` | 服务端聚合时间（UTC） |
 
+#### `GET /dashboard/competition` 响应约定
+
+竞品监控看板 KPI（时区按服务端 UTC「今日」起算；`top_limit` 默认 5，最大 20）。
+
+| 字段 | 说明 |
+|------|------|
+| `monitored_total` | 活跃 `competitor_bindings` 总数 |
+| `today_alert_count` | 今日触发的竞品相关告警数（`competitor_price_drop` / `competitor_rating_drop` / `competitor_discovered`） |
+| `today_price_change_count` | 今日写入且 `price_change_pct` 非空且非 0 的快照条数 |
+| `top_changes` | 今日 |Δ%| 最大的变动 Top N：竞品名、自营商品、涨跌幅、现价、方向 |
+| `summary` | 一句话运营摘要（服务端拼接，非 LLM） |
+| `generated_at` | 聚合时间（UTC） |
+
 ### 3.7 前端路由 ↔ API 映射（速查）
 
 | 页面 | 主要 API |
 |------|----------|
-| `/` Dashboard | `GET /dashboard/market-overview` · `GET /dashboard/*` · `GET /alerts/unread-count` · `GET /recommendations/stats` |
+| `/` Dashboard | `GET /dashboard/market-overview` · `GET /dashboard/competition` · `GET /dashboard/*` · `GET /alerts/unread-count` · `GET /recommendations/stats` |
 | `/products` | `GET /products` · `GET/POST /collection-tasks*` |
 | `/trends` | `GET /trends` · `GET /trends/{id}/insight` |
 | `/recommendations` | `GET /recommendations` · `/export` · `/stats` · `/blue-ocean` · `POST /generate` · `/scan` · `/{id}` · accept/reject · ai-analysis |
-| `/competitors` | `GET/POST/DELETE /competitors*` |
+| `/competitors` | `GET/POST/DELETE /competitors*` · `GET /competitors/{product_id}/report` · `GET /dashboard/competition` |
 | `/listing` | `POST .../generate` · `POST .../adopt` · `GET .../compare` |
 | `/inventory-alerts` | `GET /alerts` · `POST /alerts/{id}/read` · `GET /inventory/risks` |
 
@@ -769,22 +815,28 @@ workers ──► services（复用同一领域逻辑）
   可见新数据 + last_synced_at 刷新
 ```
 
-### 4.3 竞品降价告警（A-01 / A-02，延迟 < 30min）
+### 4.3 竞品价格监控与自动告警（A-01 / A-02，延迟 < 30min）
 
 ```
-[Cron / Worker · 每小时]
+[Cron / Worker · 每小时] 或 [POST /alerts/check]
     │  遍历 active competitor_bindings
-    │  拉取竞品最新价 → INSERT competitor_snapshots
-    │  Δ% = (new - prev) / prev
+    │  拉取竞品最新价/评分 → INSERT competitor_snapshots
+    │  Δprice% = (new - prev) / prev
+    │  Δrating = prev_rating - new_rating
     ▼
-[AlertService.evaluate()]
-    │  IF Δ% <= -threshold (default 5%)
-    │    INSERT alerts (type=competitor_price_drop, is_read=false)
+[AlertService.evaluate_competitor_change()]
+    │  Δprice% ≤ -10% → critical + competitor_price_drop
+    │  Δprice% ≤ -5%  → warning  + competitor_price_drop
+    │  Δrating > 0.5  → warning  + competitor_rating_drop
     │  失效 unread-count 缓存
+    ▼
+[Discover 路径]
+    │  新绑定 Top≤10 → info + competitor_discovered
     ▼
 [Browser]
     │  GET /alerts/unread-count  → 侧栏 ●N + P1 KPI
     │  GET /alerts?is_read=false → P6/库存页「告警记录」
+    │  GET /alerts/stats         → 统计分布
     │  POST /alerts/{id}/read    → is_read=true；计数 -1
 ```
 
@@ -948,8 +1000,8 @@ Platform:            amazon | shopee
 CollectionFrequency: hourly | daily | manual
 CollectionStatus:    pending | running | success | failed
 RecommendationStatus: pending | accepted | rejected
-AlertType:           competitor_price_drop | inventory_low | collection_failed
-AlertSeverity:       info | warning | critical
+AlertType:           competitor_price_drop | competitor_rating_drop | competitor_discovered | inventory_low | collection_failed
+AlertSeverity:       info | warning | critical   # 对应业务 low | medium | high
 ListingSource:       original | ai_generated | adopted
 TrendVerdict:        growing | shrinking | stable
 InventoryRisk:       normal | watch | critical

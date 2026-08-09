@@ -54,6 +54,12 @@
 - [x] 选品推荐管理接口：`GET /recommendations`（分页，筛 status/platform）、详情、accept/reject（409 状态冲突）、`GET /export` CSV、`GET /stats`；已回写 SDD §3.3
 - [x] 定时选品扫描：`scan_all_categories` + ARQ Cron 每日 03:30（Asia/Shanghai）+ `POST /recommendations/scan`（入队/同步）+ 分差≤20% 跳过 + webhook 预留；已回写 SDD / DD-016
 - [x] 选品推荐页（`Selections.vue`）：蓝海发现卡片网格（圆环色阶/四维条/风险标签）+ 筛选分页 + AI 分析抽屉四块 + 推荐列表/已接受 Tab；对接 blue-ocean / recommendations / ai-analysis / accept·reject
+- [x] 竞品监控页（`Competitors.vue`）：自营商品选择器 + 竞品表（涨跌色/告警级别）+ 多竞品价格折线对比 + 未读告警横条/列表（severity 分色、标记已读）+ 刷新确认 / 添加竞品（discover）；对接 competitors / alerts API
+- [x] 竞品监控数据模型：`WatchedProduct` / `CompetitorBinding` / `CompetitorSnapshot` / `Alert` / `SystemSetting`（对齐 SDD §1.2.5 / §1.2.9–§1.2.11 / §1.2.14；`AlertType`/`AlertSeverity`；活跃绑定部分唯一索引；快照 BIGSERIAL）
+- [x] 竞品发现服务：`CompetitorDiscoveryService`（`discover_competitors` / `update_competitor_data` / `batch_update_all`）+ API `GET /competitors/discover`、`GET /competitors/{id}`、`POST /competitors/batch-update`、`POST /competitors/{id}/refresh`；AI 挑选 + 启发式回落；快照与降价告警评估
+- [x] 价格监控与自动告警：`AlertService`（降价 5%→warning / 10%→critical、评分降 0.5→warning、Top10 发现→info）+ API `GET /alerts`、`POST /alerts/{id}/read`、`GET /alerts/unread-count`、`GET /alerts/stats`、`POST /alerts/check`；已回写 SDD / DD-019
+- [x] 竞品分析报告：`GET /competitors/{product_id}/report`（价格区间 / 价格·评分·评论排名 / 价格趋势 / AI 洞察；无绑定回落同品类）；已回写 SDD / DD-020
+- [x] 竞品监控看板：`GET /dashboard/competition`（监控总数 / 今日告警 / 今日价格变动 / Top 变动 / 一句话摘要）；已回写 SDD / DD-021
 - [ ] 为本轮模型生成 Alembic 初始迁移（进入生产部署前）
 
 

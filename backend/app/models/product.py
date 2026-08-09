@@ -29,9 +29,12 @@ from app.database import Base
 from app.models.enums import Platform
 
 if TYPE_CHECKING:
+    from app.models.alert import Alert
     from app.models.category import Category
+    from app.models.competitor_binding import CompetitorBinding
     from app.models.product_history import ProductHistory
     from app.models.recommendation import Recommendation
+    from app.models.watched_product import WatchedProduct
 
 JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
@@ -116,6 +119,29 @@ class Product(Base):
     )
     recommendations: Mapped[list[Recommendation]] = relationship(
         "Recommendation",
+        back_populates="product",
+        passive_deletes=True,
+    )
+    watched_by: Mapped[list[WatchedProduct]] = relationship(
+        "WatchedProduct",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    competitor_bindings_as_own: Mapped[list[CompetitorBinding]] = relationship(
+        "CompetitorBinding",
+        foreign_keys="CompetitorBinding.own_product_id",
+        back_populates="own_product",
+        passive_deletes=True,
+    )
+    competitor_bindings_as_competitor: Mapped[list[CompetitorBinding]] = relationship(
+        "CompetitorBinding",
+        foreign_keys="CompetitorBinding.competitor_product_id",
+        back_populates="competitor_product",
+        passive_deletes=True,
+    )
+    alerts: Mapped[list[Alert]] = relationship(
+        "Alert",
         back_populates="product",
         passive_deletes=True,
     )

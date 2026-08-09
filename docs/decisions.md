@@ -213,6 +213,66 @@ SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:
 
 ---
 
+## DD-017 · 竞品监控按 SDD 拆五表，快照用 BIGSERIAL
+
+**决策：**  
+模块四模型严格按 SDD：`watched_products`（目标商品选择器）、`competitor_bindings`（软删 + 活跃对部分唯一索引）、`competitor_snapshots`（BIGSERIAL 时序）、`alerts`（含 binding/阈值/触发值字段）、`system_settings`（降价阈值 KV）。不合并告警进绑定表；不自建 `payload` JSON 替代 SDD 列。
+
+**理由：**  
+与采集调度、未读角标、看板 KPI 共用同一 `alerts` 表；时序快照高写入用自增整型 PK；部分唯一索引支持软删后重新绑定。
+
+**状态：** 已采纳（2026-08-08）
+
+---
+
+## DD-018 · 竞品发现：同品类检索 + AI 挑选，失败回落启发式
+
+**决策：**  
+`GET /competitors/discover`（Could）在同品类候选池上用 LLM 按 `candidate_index` 挑选并自动创建 `competitor_bindings` + 首条快照；LLM 失败或关闭时用标题重合/价格接近/评论量启发式。`POST /competitors/batch-update` 与单条 `refresh` 拉取数据源详情（失败回落本地价）写 `competitor_snapshots`，并按 `alert.price_drop_threshold`（默认 5%）评估降价告警。
+
+**理由：**  
+候选序号约束避免模型编造 UUID；自动建绑定满足「发现即监控」；快照与告警路径对齐 SDD §4.3，供小时 Worker 复用同一服务方法。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §3.4）
+
+---
+
+## DD-019 · 告警 severity 保留 info/warning/critical，业务 low/medium/high 映射
+
+**决策：**  
+库内 `AlertSeverity` 仍为 `info|warning|critical`（对齐既有 SDD）；业务规则口语 low/medium/high 分别映射。新增类型 `competitor_rating_drop`、`competitor_discovered`。降价：超 5%→warning、超 10%→critical；评分降超 0.5→warning；Top10 新发现→info。API 增补 `GET /alerts/stats`、`POST /alerts/check`（SDD 原缺省先回写再实现）。
+
+**理由：**  
+避免破坏已建表与附录枚举；映射关系写进 SDD 便于前后端统一展示文案。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §1.2.11 / §3.4 / §4.3 / 附录 A）
+
+---
+
+## DD-020 · 竞品分析报告对比集优先活跃绑定
+
+**决策：**  
+`GET /competitors/{product_id}/report` 对比集 = 自身 + 活跃 `competitor_bindings`；无绑定时回落同品类评论量 Top10。排名约定：`price_rank` 1=最便宜，`rating_rank` / `review_count_rank` 1=最高。趋势：自营走 `product_histories`，竞品走快照日均价。洞察走 LLM，失败回落启发式。
+
+**理由：**  
+报告应反映运营已监控的竞品，而非全品类噪声；回落保证冷启动仍可出图。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §3.4）
+
+---
+
+## DD-021 · 竞品监控看板只读聚合，摘要服务端拼接
+
+**决策：**  
+新增 `GET /dashboard/competition`：监控总数=活跃绑定；今日告警仅计竞品三类；今日变价=当日 `price_change_pct≠0` 快照数；Top 按 |Δ%| 排序。`summary` 用规则模板拼接，不调 LLM，保证看板秒开。
+
+**理由：**  
+看板 KPI 需稳定低延迟；一句话摘要字段固定、信息密度有限，启发式足够。
+
+**状态：** 已采纳（2026-08-08，已回写 `docs/SDD.md` §3.6）
+
+---
+
 ## 变更日志
 
 | 日期 | 说明 |
@@ -222,3 +282,8 @@ SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:
 | 2026-08-08 | 新增 DD-014：选品权重 30/20/25/25 与 generate API |
 | 2026-08-08 | 新增 DD-015：选品 AI 深度分析 API 与 `reason` 字段 |
 | 2026-08-08 | 新增 DD-016：ARQ 日批选品扫描与 webhook 预留 |
+| 2026-08-08 | 新增 DD-017：竞品监控五表建模 |
+| 2026-08-08 | 新增 DD-018：竞品发现服务与 API |
+| 2026-08-08 | 新增 DD-019：价格监控告警规则与 alerts API |
+| 2026-08-08 | 新增 DD-020：竞品分析报告 API |
+| 2026-08-08 | 新增 DD-021：竞品监控看板 API |

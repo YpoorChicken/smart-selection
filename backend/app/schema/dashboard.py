@@ -65,3 +65,28 @@ class MarketOverviewData(BaseModel):
     price_trend: list[OverviewPriceTrendPoint]
     seasonality_insights: list[SeasonalityInsightItem]
     generated_at: datetime
+
+
+class CompetitionTopChangeItem(BaseModel):
+    """今日价格变动 Top 条目。"""
+
+    binding_id: uuid.UUID
+    own_product_id: uuid.UUID
+    own_product_title: str
+    competitor_product_id: uuid.UUID
+    competitor_product_title: str
+    price: Decimal
+    price_change_pct: Decimal
+    direction: str = Field(description="up | down")
+    recorded_at: datetime
+
+
+class CompetitionDashboardData(BaseModel):
+    """竞品监控看板聚合数据。"""
+
+    monitored_total: int = Field(ge=0, description="活跃监控绑定总数")
+    today_alert_count: int = Field(ge=0, description="今日竞品相关告警数")
+    today_price_change_count: int = Field(ge=0, description="今日价格变动快照数")
+    top_changes: list[CompetitionTopChangeItem] = Field(default_factory=list)
+    summary: str = Field(description="一句话运营摘要")
+    generated_at: datetime

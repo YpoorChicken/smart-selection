@@ -9,17 +9,28 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.alert import Alert
 from app.models.category import Category
 from app.models.category_trend import CategoryTrend
-from app.models.enums import Platform
+from app.models.competitor_binding import CompetitorBinding
+from app.models.competitor_snapshot import CompetitorSnapshot
+from app.models.enums import AlertType, Platform
 from app.models.product import Product
 from app.models.product_history import ProductHistory
 from app.schema.dashboard import (
+    CompetitionDashboardData,
+    CompetitionTopChangeItem,
     FastestGrowingCategory,
     MarketOverviewData,
     MostCompetitiveCategory,
     OverviewPriceTrendPoint,
     SeasonalityInsightItem,
+)
+
+_COMPETITOR_ALERT_TYPES = (
+    AlertType.competitor_price_drop,
+    AlertType.competitor_rating_drop,
+    AlertType.competitor_discovered,
 )
 
 MONEY_QUANT = Decimal("0.01")
@@ -66,6 +77,146 @@ class DashboardService:
             seasonality_insights=seasonality,
             generated_at=datetime.now(timezone.utc),
         )
+
+    def get_competition_dashboard(
+        self,
+        *,
+        top_limit: int = 5,
+    ) -> CompetitionDashboardData:
+        """竞品监控看板：监控总数、今日告警/变价、Top 变动、一句话摘要。"""
+        if top_limit < 1 or top_limit > 20:
+            raise ValueError("top_limit 必须在 1 到 20 之间")
+
+        now = datetime.now(timezone.utc)
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        monitored_total = int(
+            self.db.scalar(
+                select(func.count())
+                .select_from(CompetitorBinding)
+                .where(CompetitorBinding.is_active.is_(True))
+            )
+            or 0
+        )
+        today_alert_count = int(
+            self.db.scalar(
+                select(func.count())
+                .select_from(Alert)
+                .where(
+                    Alert.triggered_at >= day_start,
+                    Alert.type.in_(_COMPETITOR_ALERT_TYPES),
+                )
+            )
+            or 0
+        )
+
+        change_filters = (
+            CompetitorSnapshot.recorded_at >= day_start,
+            CompetitorSnapshot.price_change_pct.is_not(None),
+            CompetitorSnapshot.price_change_pct != 0,
+        )
+        today_price_change_count = int(
+            self.db.scalar(
+                select(func.count())
+                .select_from(CompetitorSnapshot)
+                .where(*change_filters)
+            )
+            or 0
+        )
+
+        top_rows = list(
+            self.db.scalars(
+                select(CompetitorSnapshot)
+                .where(*change_filters)
+                .options(
+                    joinedload(CompetitorSnapshot.binding).joinedload(
+                        CompetitorBinding.own_product
+                    ),
+                    joinedload(CompetitorSnapshot.binding).joinedload(
+                        CompetitorBinding.competitor_product
+                    ),
+                )
+                .order_by(desc(func.abs(CompetitorSnapshot.price_change_pct)))
+                .limit(top_limit)
+            )
+            .unique()
+            .all()
+        )
+
+        top_changes: list[CompetitionTopChangeItem] = []
+        for snap in top_rows:
+            binding = snap.binding
+            if binding is None:
+                continue
+            own = binding.own_product
+            competitor = binding.competitor_product
+            pct = snap.price_change_pct
+            if pct is None:
+                continue
+            top_changes.append(
+                CompetitionTopChangeItem(
+                    binding_id=binding.id,
+                    own_product_id=binding.own_product_id,
+                    own_product_title=own.title if own else "自营商品",
+                    competitor_product_id=binding.competitor_product_id,
+                    competitor_product_title=(
+                        competitor.title if competitor else "竞品"
+                    ),
+                    price=snap.price,
+                    price_change_pct=pct.quantize(
+                        RATE_QUANT, rounding=ROUND_HALF_UP
+                    ),
+                    direction="down" if pct < 0 else "up",
+                    recorded_at=snap.recorded_at,
+                )
+            )
+
+        summary = self._competition_summary(
+            monitored_total=monitored_total,
+            today_alert_count=today_alert_count,
+            today_price_change_count=today_price_change_count,
+            top_changes=top_changes,
+        )
+
+        return CompetitionDashboardData(
+            monitored_total=monitored_total,
+            today_alert_count=today_alert_count,
+            today_price_change_count=today_price_change_count,
+            top_changes=top_changes,
+            summary=summary,
+            generated_at=now,
+        )
+
+    @staticmethod
+    def _competition_summary(
+        *,
+        monitored_total: int,
+        today_alert_count: int,
+        today_price_change_count: int,
+        top_changes: list[CompetitionTopChangeItem],
+    ) -> str:
+        if monitored_total == 0:
+            return "当前暂无活跃竞品监控，可先绑定或自动发现竞品后再盯盘。"
+
+        parts = [f"正在监控 {monitored_total} 个竞品"]
+        if today_price_change_count == 0 and today_alert_count == 0:
+            parts.append("今日价格平稳、暂无新告警")
+        else:
+            parts.append(
+                f"今日 {today_price_change_count} 次价格变动、"
+                f"{today_alert_count} 条告警"
+            )
+
+        if top_changes:
+            lead = top_changes[0]
+            pct = abs(float(lead.price_change_pct) * 100)
+            verb = "降价" if lead.direction == "down" else "涨价"
+            parts.append(
+                f"最大变动为「{lead.competitor_product_title[:40]}」"
+                f"{verb} {pct:.1f}%"
+            )
+
+        return "；".join(parts) + "。"
 
     def _count_categories(self, platform_id: Platform | None) -> int:
         stmt = select(func.count()).select_from(Category)
