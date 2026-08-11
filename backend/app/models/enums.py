@@ -81,3 +81,65 @@ class AlertSeverity(str, enum.Enum):
     info = "info"
     warning = "warning"
     critical = "critical"
+
+
+class ListingSource(str, enum.Enum):
+    """Listing 版本来源（SDD 附录 A / §1.2.12）。"""
+
+    original = "original"
+    ai_generated = "ai_generated"
+    adopted = "adopted"
+
+
+class KeywordCategory(str, enum.Enum):
+    """Listing 关键词分类（核心 / 长尾 / 品牌 / 场景）。"""
+
+    core = "core"
+    long_tail = "long_tail"
+    brand = "brand"
+    scenario = "scenario"
+
+
+class ABTestStatus(str, enum.Enum):
+    """Listing A/B 测试状态。"""
+
+    running = "running"
+    completed = "completed"
+    cancelled = "cancelled"
+
+
+class ABTestMetric(str, enum.Enum):
+    """
+    A/B 测试观测指标。
+
+    MVP 以人工选择胜出为主；ctr / conversion 为后续接平台数据预留。
+    """
+
+    manual = "manual"
+    ctr = "ctr"
+    conversion = "conversion"
+    keyword_coverage = "keyword_coverage"
+
+
+class ABTestWinner(str, enum.Enum):
+    """A/B 测试胜出方。"""
+
+    a = "a"
+    b = "b"
+
+
+class BatchOptimizeStatus(str, enum.Enum):
+    """批量 Listing 优化任务状态。"""
+
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+
+
+class BatchOptimizeItemStatus(str, enum.Enum):
+    """批量优化中单个 Listing 的状态。"""
+
+    pending = "pending"
+    running = "running"
+    success = "success"
+    failed = "failed"

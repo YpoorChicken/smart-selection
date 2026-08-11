@@ -34,6 +34,21 @@ export async function getProducts(query: ProductQuery): Promise<PageData<Product
   return getResponseData(response)
 }
 
+export async function getProduct(productId: string): Promise<ProductListItem & {
+  bullet_points?: string[] | null
+  keywords?: string | null
+}> {
+  const response = await request.get<
+    ApiResponse<
+      ProductListItem & {
+        bullet_points?: string[] | null
+        keywords?: string | null
+      }
+    >
+  >(`/products/${productId}`)
+  return getResponseData(response)
+}
+
 export async function getProductHistory(
   productId: string,
   limit = 90,

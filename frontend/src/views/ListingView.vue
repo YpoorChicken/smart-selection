@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import PagePlaceholder from '@/components/PagePlaceholder.vue'
+/** 兼容路由；页面实现见 Listing.vue */
+import Listing from './Listing.vue'
 </script>
 
 <template>
-  <PagePlaceholder
-    title="Listing 优化"
-    description="AI Listing 生成与双栏对比将在此落地。"
-  />
+  <Listing />
 </template>

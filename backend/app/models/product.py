@@ -32,6 +32,8 @@ if TYPE_CHECKING:
     from app.models.alert import Alert
     from app.models.category import Category
     from app.models.competitor_binding import CompetitorBinding
+    from app.models.listing_ab_test import ListingABTest
+    from app.models.listing_version import ListingVersion
     from app.models.product_history import ProductHistory
     from app.models.recommendation import Recommendation
     from app.models.watched_product import WatchedProduct
@@ -144,4 +146,18 @@ class Product(Base):
         "Alert",
         back_populates="product",
         passive_deletes=True,
+    )
+    listing_versions: Mapped[list[ListingVersion]] = relationship(
+        "ListingVersion",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ListingVersion.version_no.desc()",
+    )
+    listing_ab_tests: Mapped[list[ListingABTest]] = relationship(
+        "ListingABTest",
+        back_populates="listing",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ListingABTest.started_at.desc()",
     )

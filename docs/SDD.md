@@ -361,6 +361,7 @@ system_settings（KV 配置，如降价阈值）
 | bullet_points | JSONB | | |
 | keywords | TEXT | | |
 | keyword_coverage | Numeric(5,2) | | 覆盖率 %；目标 > 90% |
+| reason | TEXT | NULL | AI 优化理由；原文版本可空 |
 | is_current | BOOLEAN | DEFAULT false | 当前生效版本 |
 | created_by | UUID | FK → users.id NULL | |
 | created_at | TIMESTAMPTZ | NOT NULL | |
@@ -368,6 +369,28 @@ system_settings（KV 配置，如降价阈值）
 
 **唯一约束：** `(product_id, version_no)`  
 **规则：** 采纳时事务内：旧 `is_current=false`，新版 `is_current=true`；生成失败不写残缺稿（L-04）。
+
+---
+
+#### 1.2.16 `listing_ab_tests` — Listing 文案 A/B 测试（模块五）
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | UUID | PK | |
+| listing_id | UUID | FK → products.id | 商品 Listing |
+| version_a_id | UUID | FK → listing_versions.id | 基线版本 A |
+| version_b_id | UUID | FK → listing_versions.id | 对照版本 B（AI 生成） |
+| status | ENUM | NOT NULL | `running` / `completed` / `cancelled` |
+| metric | ENUM | NOT NULL | `manual` / `ctr` / `conversion` / `keyword_coverage` |
+| started_at | TIMESTAMPTZ | NOT NULL | |
+| completed_at | TIMESTAMPTZ | NULL | |
+| winner | ENUM | NULL | `a` / `b`；完成后填写 |
+| created_by | UUID | FK → users.id NULL | |
+| created_at | TIMESTAMPTZ | NOT NULL | |
+| updated_at | TIMESTAMPTZ | NOT NULL | |
+
+**约束：** `version_a_id ≠ version_b_id`；同一 `listing_id` 同时最多一条 `status=running`（部分唯一索引）。  
+**规则：** 创建时 AI 生成 B；完成时可选择胜出并采纳为 `is_current`。
 
 ---
 
@@ -430,6 +453,7 @@ users ──< competitor_bindings
 categories ──< products ──< product_histories
      │              ├──< watched_products
      │              ├──< listing_versions
+     │              ├──< listing_ab_tests
      │              ├──< inventory_snapshots
      │              ├──< alerts
      │              └──< competitor_bindings (own / competitor)
@@ -704,12 +728,61 @@ workers ──► services（复用同一领域逻辑）
 
 | 方法 | 路径 | 说明 | 角色 |
 |------|------|------|------|
+| POST | `/listing/keywords/extract/{product_id}` | 从自营+竞品标题挖掘高频词并分类 | 全角色读 |
+| GET | `/listing/keywords/suggest` | 基于品类推荐热门搜索词（`category_id` 必填） | 全角色读 |
+| POST | `/listing/optimize/{listing_id}` | LLM 生成优化文案并落库新 `ListingVersion` | 运营 |
+| POST | `/listing/ab-test/create` | 创建 A/B：锁定 A，AI 生成 B | 运营 |
+| PUT | `/listing/ab-test/{id}/complete` | 选择胜出并结束（默认可采纳为 current） | 运营 |
+| GET | `/listing/ab-test/history` | A/B 历史（分页，可筛 listing_id/status） | 全角色读 |
+| POST | `/listing/batch-optimize` | 批量 AI 优化：提交 `listing_ids`，返回 `task_id` | 运营 |
+| GET | `/listing/batch-optimize/{task_id}` | 查询批量优化进度 | 运营 |
+| GET | `/listing/{product_id}/current` | 当前生效原文/版本（无版本则合成商品原文） | 全角色读 |
+| GET | `/listing/{product_id}/versions` | 版本时间线 | 全角色读 |
+| GET | `/listing/{product_id}/compare` | 原文 vs 指定优化稿双栏数据 | 全角色读 |
+| POST | `/listing/{product_id}/versions/{version_id}/adopt` | 采纳/回滚为当前生效并回写商品 | 运营 |
 | GET | `/listings/{product_id}/current` | 当前生效原文/版本 | 运营 |
 | GET | `/listings/{product_id}/versions` | 版本时间线 | 运营 |
-| POST | `/listings/{product_id}/generate` | 触发 AI 生成（异步或同步+超时） | 运营 |
+| POST | `/listings/{product_id}/generate` | 触发 AI 生成（异步或同步+超时；可用 optimize 替代） | 运营 |
 | GET | `/listings/jobs/{job_id}` | 生成任务状态（若异步） | 运营 |
 | POST | `/listings/{product_id}/versions/{version_id}/adopt` | 采纳为新版本 | 运营 |
 | GET | `/listings/{product_id}/compare` | 原文 vs 指定优化稿双栏数据 | 运营 |
+
+#### 关键词挖掘约定
+
+| 能力 | 说明 |
+|------|------|
+| `extract_keywords` | 语料 = 自营 `title` / `keywords` / `bullet_points` + 活跃竞品标题；英文 unigram/bi/trigram + 中文 bi/trigram；热度分 = 频次 × log(1+文档覆盖) |
+| `categorize_keywords` | 四类：`core` 核心词 / `long_tail` 长尾词 / `brand` 品牌词 / `scenario` 场景词 |
+| `suggest_keywords` | 品类含子类，最多采样 200 个商品标题聚合；查询参数 `category_id`（必填）、`limit`（1–100，默认 30） |
+| `extract` 查询参数 | `limit`（1–100，默认 40） |
+
+#### `POST /listing/optimize/{listing_id}` 约定
+
+| 项 | 说明 |
+|------|------|
+| `listing_id` | 商品 UUID，或已有 `ListingVersion` UUID（以其为 parent） |
+| LLM 输入 | 商品信息（标题/描述/卖点）+ 关键词种子 + 竞品标题 |
+| LLM 输出 | Pydantic：`title` / `bullet_points`(恰 5 条) / `description` / `search_keywords` / `reason` |
+| 落库 | 成功才 INSERT `listing_versions`：`source=ai_generated`、`is_current=false`、`parent_version_id` 指向基线；写 `keyword_coverage` 与 `reason` |
+| 基线 | 商品尚无版本时，先写入一条 `original`（`is_current=true`）再生成优化稿 |
+| 失败 | LLM/校验失败 → HTTP 502，不写残缺稿（L-04） |
+
+#### Listing A/B 测试约定
+
+| 接口 | 说明 |
+|------|------|
+| `POST /listing/ab-test/create` | Body：`listing_id`（商品）、可选 `version_a_id`、`metric`（默认 `manual`）。AI 生成 B 后写入 `listing_ab_tests`（`running`）。同 Listing 已有 running → 409 |
+| `PUT /listing/ab-test/{id}/complete` | Body：`winner`=`a`\|`b`，`adopt` 默认 true。仅 `running` 可完成；采纳时事务内切换 `is_current`，AI 稿可标 `adopted` |
+| `GET /listing/ab-test/history` | Query：`listing_id`、`status`、`page`、`page_size`；按 `started_at` 倒序 |
+
+#### 批量优化约定
+
+| 项 | 说明 |
+|------|------|
+| `POST /listing/batch-optimize` | Body：`listing_ids`（1–50，保序去重）。立即返回 `task_id` / `status=queued` / `total`；后台逐个调用单条 optimize |
+| `GET /listing/batch-optimize/{task_id}` | 返回任务状态与每项 `pending`/`running`/`success`/`failed`；含 `progress_pct`、成功/失败计数 |
+| 失败策略 | 单项失败记 `failed` + `error`，继续下一项，不中断整批 |
+| 进度存储 | Redis（TTL 7 天）；Redis 不可用时回落进程内存（开发降级） |
 
 ### 3.6 模块六 — 运营看板与库存 / 部署
 
@@ -758,7 +831,7 @@ workers ──► services（复用同一领域逻辑）
 | `/trends` | `GET /trends` · `GET /trends/{id}/insight` |
 | `/recommendations` | `GET /recommendations` · `/export` · `/stats` · `/blue-ocean` · `POST /generate` · `/scan` · `/{id}` · accept/reject · ai-analysis |
 | `/competitors` | `GET/POST/DELETE /competitors*` · `GET /competitors/{product_id}/report` · `GET /dashboard/competition` |
-| `/listing` | `POST .../generate` · `POST .../adopt` · `GET .../compare` |
+| `/listing` | `POST /listing/optimize/{id}` · `GET /listing/{id}/current` · `GET /listing/{id}/versions` · `POST .../adopt` · `GET .../compare` · `POST /listing/batch-optimize` · `POST /listing/ab-test/create` · `PUT .../complete` · `GET .../history` |
 | `/inventory-alerts` | `GET /alerts` · `POST /alerts/{id}/read` · `GET /inventory/risks` |
 
 ---
@@ -844,12 +917,14 @@ workers ──► services（复用同一领域逻辑）
 
 ```
 [Browser P7]
-    │  POST /listings/{product_id}/generate
+    │  POST /listing/optimize/{listing_id}
     ▼
-[ListingService.generate()]
-    │  读 products 当前文案 + 品类关键词上下文（trends/competitors 摘要）
-    │  OpenAI Chat Completion（结构化 JSON：title/bullets/description/keywords）
-    │  成功 → INSERT listing_versions (source=ai_generated, is_current=false)
+[ListingOptimizeService.optimize()]
+    │  解析 listing_id → product + parent version
+    │  无版本 → INSERT original（商品原文快照）
+    │  KeywordMiningService.extract_keywords + 竞品标题
+    │  LLM（结构化 JSON：title / bullet_points×5 / description / search_keywords / reason）
+    │  成功 → INSERT listing_versions (source=ai_generated, is_current=false, parent_version_id)
     │  失败 → 不写库；返回可重试错误（原文不变）
     ▼
 [Browser] GET compare → 双栏原文 | 优化稿
@@ -1003,6 +1078,12 @@ RecommendationStatus: pending | accepted | rejected
 AlertType:           competitor_price_drop | competitor_rating_drop | competitor_discovered | inventory_low | collection_failed
 AlertSeverity:       info | warning | critical   # 对应业务 low | medium | high
 ListingSource:       original | ai_generated | adopted
+KeywordCategory:     core | long_tail | brand | scenario
+ABTestStatus:        running | completed | cancelled
+ABTestMetric:        manual | ctr | conversion | keyword_coverage
+ABTestWinner:        a | b
+BatchOptimizeStatus: queued | running | completed
+BatchOptimizeItemStatus: pending | running | success | failed
 TrendVerdict:        growing | shrinking | stable
 InventoryRisk:       normal | watch | critical
 ```

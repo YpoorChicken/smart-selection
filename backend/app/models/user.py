@@ -15,6 +15,7 @@ from app.models.enums import UserRole
 if TYPE_CHECKING:
     from app.models.alert import Alert
     from app.models.competitor_binding import CompetitorBinding
+    from app.models.listing_version import ListingVersion
     from app.models.recommendation import Recommendation
     from app.models.system_setting import SystemSetting
     from app.models.watched_product import WatchedProduct
@@ -102,6 +103,12 @@ class User(Base):
         "SystemSetting",
         back_populates="updater",
         foreign_keys="SystemSetting.updated_by",
+        passive_deletes=True,
+    )
+    listing_versions: Mapped[list[ListingVersion]] = relationship(
+        "ListingVersion",
+        back_populates="creator",
+        foreign_keys="ListingVersion.created_by",
         passive_deletes=True,
     )
 

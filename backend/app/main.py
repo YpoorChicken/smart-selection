@@ -20,6 +20,7 @@ from app.routers import (
     categories,
     competitors,
     dashboard,
+    listing,
     products,
     recommendations,
     sync,
@@ -152,6 +153,7 @@ app.include_router(sync.router, prefix="/api/v1")
 app.include_router(trends.router, prefix="/api/v1")
 app.include_router(recommendations.router, prefix="/api/v1")
 app.include_router(competitors.router, prefix="/api/v1")
+app.include_router(listing.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(system.router, prefix="/api/v1")

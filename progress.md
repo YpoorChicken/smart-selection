@@ -60,6 +60,13 @@
 - [x] 价格监控与自动告警：`AlertService`（降价 5%→warning / 10%→critical、评分降 0.5→warning、Top10 发现→info）+ API `GET /alerts`、`POST /alerts/{id}/read`、`GET /alerts/unread-count`、`GET /alerts/stats`、`POST /alerts/check`；已回写 SDD / DD-019
 - [x] 竞品分析报告：`GET /competitors/{product_id}/report`（价格区间 / 价格·评分·评论排名 / 价格趋势 / AI 洞察；无绑定回落同品类）；已回写 SDD / DD-020
 - [x] 竞品监控看板：`GET /dashboard/competition`（监控总数 / 今日告警 / 今日价格变动 / Top 变动 / 一句话摘要）；已回写 SDD / DD-021
+- [x] Listing 管理数据模型：`ListingVersion` / `listing_versions` + `ListingSource`（对齐 SDD §1.2.12 / 附录 A；`(product_id, version_no)` 唯一；`is_current` 部分唯一；自引用 `parent_version_id`）；已记 DD-022
+- [x] Listing 关键词挖掘：`KeywordMiningService`（`extract_keywords` / `categorize_keywords` / `suggest_keywords`）+ API `POST /listing/keywords/extract/{product_id}`、`GET /listing/keywords/suggest`；`KeywordCategory` 四类；已回写 SDD / DD-023
+- [x] Listing AI 优化：`ListingOptimizeService` + `LLMClient.generate_listing_optimize` + API `POST /listing/optimize/{listing_id}`；Pydantic 约束标题/5卖点/描述/搜索词/理由；落库新 `ListingVersion`（含 `reason`）；已回写 SDD / DD-024
+- [x] Listing A/B 测试：`ListingABTest` / `listing_ab_tests` + API `POST /listing/ab-test/create`、`PUT /listing/ab-test/{id}/complete`、`GET /listing/ab-test/history`；创建时 AI 生成 B，完成可选采纳胜出；已回写 SDD / DD-025
+- [x] Listing 批量优化：`ListingBatchOptimizeService` + API `POST /listing/batch-optimize`、`GET /listing/batch-optimize/{task_id}`；BackgroundTasks 逐个执行，单项失败不中断；进度 Redis/内存；已回写 SDD / DD-026
+- [x] Listing 版本 API：`GET /listing/{id}/current|versions|compare`、`POST .../versions/{id}/adopt`
+- [x] Listing 优化页（`Listing.vue`）：商品选择器 + 双栏对比（原版/AI 优化版）+ 关键词增删高亮 + 优化理由 + 版本时间线回滚 + A/B 胜出入口；对接 optimize / versions / adopt / ab-test
 - [ ] 为本轮模型生成 Alembic 初始迁移（进入生产部署前）
 
 

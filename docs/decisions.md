@@ -273,6 +273,66 @@ SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:
 
 ---
 
+## DD-022 · Listing 版本单表 + 当前生效部分唯一
+
+**决策：**  
+模块五仅建 `listing_versions`（对齐 SDD §1.2.12），不另建 jobs 持久表；异步任务状态走 Redis/ARQ。约束：`(product_id, version_no)` 唯一；`is_current=true` 对 `product_id` 部分唯一，保证采纳后「一商品一当前稿」。`bullet_points` 用 JSON + PostgreSQL JSONB variant。生成失败不落库（L-04）。
+
+**理由：**  
+版本时间线与原文/优化稿对比只需一表；部分唯一索引把采纳事务的不变量下沉到 DB，避免并发采纳双 current。
+
+**状态：** 已采纳（2026-08-10，对齐 `docs/SDD.md` §1.2.12 / §4.4）
+
+---
+
+## DD-023 · Listing 关键词挖掘走启发式，不落库
+
+**决策：**  
+`KeywordMiningService` 提供 `extract_keywords` / `categorize_keywords` / `suggest_keywords`；API 前缀用 `/listing/keywords/*`（与前端路由 `/listing` 对齐）。分类四档：`core` / `long_tail` / `brand` / `scenario`。无 jieba 依赖：英文 n-gram + 中文 bi/trigram；热度 = 频次 × log(1+DF)。挖掘结果即时返回，不写表。
+
+**理由：**  
+关键词挖掘是 Listing 生成前的辅助输入，结果随商品/竞品标题变化；落库会引入过期缓存与同步成本。启发式可离线可测，失败面小于再调一次 LLM。
+
+**状态：** 已采纳（2026-08-10，已回写 `docs/SDD.md` §3.5）
+
+---
+
+## DD-024 · Listing 优化走同步 LLM + 新版本落库
+
+**决策：**  
+`POST /listing/optimize/{listing_id}`：`listing_id` 可解析为商品或已有版本；输入 = 商品文案 + 关键词种子 + 竞品标题；输出用 `ListingOptimizeAIResult`（Pydantic）约束五字段。成功才 INSERT `listing_versions`（`ai_generated` / 非 current / `parent_version_id`）；无版本时先落 `original`。`reason` 与 `keyword_coverage` 一并落库。失败 502 不写残缺稿。
+
+**理由：**  
+与 SDD L-04 一致；版本链支持对比与回滚，不在生成时直接覆盖 current，避免误采纳。
+
+**状态：** 已采纳（2026-08-10，已回写 `docs/SDD.md` §1.2.12 / §3.5 / §4.4）
+
+---
+
+## DD-025 · Listing A/B 测试单表 + 人工选胜出
+
+**决策：**  
+新增 `listing_ab_tests`：`listing_id`（商品）+ `version_a_id` / `version_b_id` + `status` / `metric` / `winner`。创建接口 AI 生成 B；同 Listing 仅允许一条 `running`。MVP `metric` 默认 `manual`，完成接口人工选 `a`/`b`，默认 `adopt=true` 切换 `is_current`。不接平台实时 CTR（预留枚举）。
+
+**理由：**  
+跨境 Listing 优化的 A/B 核心是「基线 vs AI 稿」可回溯对比；真实流量指标依赖平台回传，MVP 先闭环版本与采纳。
+
+**状态：** 已采纳（2026-08-10，已回写 `docs/SDD.md` §1.2.16 / §3.5）
+
+---
+
+## DD-026 · 批量 Listing 优化：任务进度 Redis + 失败不中断
+
+**决策：**  
+`POST /listing/batch-optimize` 立即返回 `task_id`，用 FastAPI `BackgroundTasks` 后台逐个调用单条 optimize；进度 JSON 存 Redis（TTL 7 天，不可用回落内存）。`GET /listing/batch-optimize/{task_id}` 查进度。单项失败记 `failed` 后继续，整批仍标记 `completed`。
+
+**理由：**  
+批量 LLM 耗时长，需可轮询；进程内 BackgroundTasks 免强依赖 ARQ Worker，与「失败不中断」一致。
+
+**状态：** 已采纳（2026-08-10，已回写 `docs/SDD.md` §3.5）
+
+---
+
 ## 变更日志
 
 | 日期 | 说明 |
@@ -287,3 +347,8 @@ SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:
 | 2026-08-08 | 新增 DD-019：价格监控告警规则与 alerts API |
 | 2026-08-08 | 新增 DD-020：竞品分析报告 API |
 | 2026-08-08 | 新增 DD-021：竞品监控看板 API |
+| 2026-08-10 | 新增 DD-022：Listing 版本模型与当前生效部分唯一索引 |
+| 2026-08-10 | 新增 DD-023：Listing 关键词挖掘服务与 API |
+| 2026-08-10 | 新增 DD-024：Listing AI 优化 API 与版本落库 |
+| 2026-08-10 | 新增 DD-025：Listing A/B 测试模型与 API |
+| 2026-08-10 | 新增 DD-026：Listing 批量优化与进度查询 |

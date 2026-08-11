@@ -5,6 +5,8 @@ from app.models.category import Category
 from app.models.category_trend import CategoryTrend
 from app.models.competitor_binding import CompetitorBinding
 from app.models.competitor_snapshot import CompetitorSnapshot
+from app.models.listing_ab_test import ListingABTest
+from app.models.listing_version import ListingVersion
 from app.models.platform_credential import PlatformCredential
 from app.models.product import Product
 from app.models.product_history import ProductHistory
@@ -24,6 +26,8 @@ __all__ = [
     "CategoryTrend",
     "CompetitorBinding",
     "CompetitorSnapshot",
+    "ListingABTest",
+    "ListingVersion",
     "PlatformCredential",
     "Product",
     "ProductHistory",
