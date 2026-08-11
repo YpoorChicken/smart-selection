@@ -6,7 +6,23 @@ FROM python:3.11-slim AS deps
 
 WORKDIR /build
 
-RUN apt-get update \
+# 国内 Debian APT 源（兼容 DEB822 debian.sources 与传统 sources.list）
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+      sed -i \
+        -e 's|http://deb.debian.org|https://mirrors.aliyun.com|g' \
+        -e 's|https://deb.debian.org|https://mirrors.aliyun.com|g' \
+        -e 's|http://security.debian.org|https://mirrors.aliyun.com|g' \
+        -e 's|https://security.debian.org|https://mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/debian.sources; \
+    fi; \
+    if [ -f /etc/apt/sources.list ]; then \
+      sed -i \
+        -e 's|deb.debian.org|mirrors.aliyun.com|g' \
+        -e 's|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list; \
+    fi; \
+    apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,7 +41,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR ${APP_HOME}
 
-RUN apt-get update \
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+      sed -i \
+        -e 's|http://deb.debian.org|https://mirrors.aliyun.com|g' \
+        -e 's|https://deb.debian.org|https://mirrors.aliyun.com|g' \
+        -e 's|http://security.debian.org|https://mirrors.aliyun.com|g' \
+        -e 's|https://security.debian.org|https://mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/debian.sources; \
+    fi; \
+    if [ -f /etc/apt/sources.list ]; then \
+      sed -i \
+        -e 's|deb.debian.org|mirrors.aliyun.com|g' \
+        -e 's|security.debian.org|mirrors.aliyun.com|g' \
+        /etc/apt/sources.list; \
+    fi; \
+    apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
