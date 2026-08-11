@@ -6,6 +6,11 @@ import os
 import sys
 import time
 
+# ENTRYPOINT 脚本在 /docker_entrypoint.py，默认 sys.path 不含 /app
+_APP_HOME = os.environ.get("APP_HOME", "/app")
+if _APP_HOME not in sys.path:
+    sys.path.insert(0, _APP_HOME)
+
 
 def _wait_dependencies() -> None:
     from sqlalchemy import create_engine, text

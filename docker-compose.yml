@@ -8,12 +8,17 @@ services:
     image: postgres:15-alpine
     container_name: hpzx-db
     restart: unless-stopped
+    # CentOS 等环境：写命名卷报 Operation not permitted 时使用
+    security_opt:
+      - "label:disable"
+    privileged: true
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-hpzx}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-smart_selection}
     volumes:
-      - hpzx_pgdata:/var/lib/postgresql/data
+      # :Z — 与 security_opt 二选一通常即可；两者一起更稳
+      - hpzx_pgdata:/var/lib/postgresql/data:Z
     ports:
       - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
     healthcheck:
@@ -33,7 +38,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - hpzx_redisdata:/data
+      - hpzx_redisdata:/data:Z
     ports:
       - "${REDIS_PUBLISH_PORT:-6379}:6379"
     healthcheck:

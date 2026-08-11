@@ -4,6 +4,11 @@
 # ========== Stage 1: deps ==========
 FROM python:3.11-slim AS deps
 
+# 国内 PyPI（官方源在部分网络下会超时 / versions: none）
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+    PIP_TRUSTED_HOST=mirrors.aliyun.com \
+    PIP_DEFAULT_TIMEOUT=120
+
 WORKDIR /build
 
 # 国内 Debian APT 源（兼容 DEB822 debian.sources 与传统 sources.list）
@@ -37,7 +42,8 @@ FROM python:3.11-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    APP_HOME=/app
+    APP_HOME=/app \
+    PYTHONPATH=/app
 
 WORKDIR ${APP_HOME}
 
