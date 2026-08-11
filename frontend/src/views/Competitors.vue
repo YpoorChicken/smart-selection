@@ -161,6 +161,7 @@ function platformLabel(platform: string | undefined): string {
   const map: Record<string, string> = {
     amazon: 'Amazon',
     shopee: 'Shopee',
+    dummyjson: 'DummyJSON',
     fakestore: 'FakeStore',
     mock: 'Mock',
   }
@@ -663,8 +664,8 @@ onBeforeUnmount(() => {
       <div v-else-if="tableState === 'empty'" class="state-box">
         暂无绑定竞品。点击「添加竞品」自动发现同类监控对象。
       </div>
+      <div v-else class="table-scroll">
       <el-table
-        v-else
         :data="bindings"
         row-key="id"
         class="competitor-table"
@@ -777,6 +778,7 @@ onBeforeUnmount(() => {
           </template>
         </el-table-column>
       </el-table>
+      </div>
     </section>
 
     <!-- 价格趋势 -->

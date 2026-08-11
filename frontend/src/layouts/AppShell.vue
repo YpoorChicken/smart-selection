@@ -90,15 +90,20 @@ async function handleLogout() {
 
     <el-container class="app-main-wrap">
       <el-header class="app-header" height="56px">
-        <el-breadcrumb separator="/">
-          <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-          <el-breadcrumb-item
-            v-for="(crumb, index) in breadcrumbs"
-            :key="`${crumb}-${index}`"
-          >
-            {{ crumb }}
-          </el-breadcrumb-item>
-        </el-breadcrumb>
+        <div class="header-left">
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item
+              v-for="(crumb, index) in breadcrumbs"
+              :key="`${crumb}-${index}`"
+            >
+              {{ crumb }}
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+          <span class="header-page-name" aria-current="page">{{
+            (route.meta.title as string) || '工作台'
+          }}</span>
+        </div>
 
         <div class="header-user">
           <el-avatar :size="32" class="user-avatar">
@@ -248,6 +253,29 @@ async function handleLogout() {
   padding: 0 24px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-hairline);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1;
+}
+
+.header-page-name {
+  flex-shrink: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--color-hairline);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+@media (max-width: 720px) {
+  .header-page-name {
+    display: none;
+  }
 }
 
 .header-user {

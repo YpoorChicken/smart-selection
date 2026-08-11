@@ -16,9 +16,11 @@ from app.schema.product import (
     ProductHistoryPoint,
     ProductListItem,
     ProductSortBy,
+    SalesForecastData,
     SortOrder,
 )
 from app.services.products.query_service import ProductQueryService
+from app.services.sales_forecast_service import SalesForecastService
 
 router = APIRouter(prefix="/products", tags=["商品"])
 
@@ -120,3 +122,62 @@ def get_product_history(
             items=[ProductHistoryPoint.model_validate(row) for row in rows],
         )
     )
+
+
+@router.get(
+    "/{product_id}/sales-forecast",
+    response_model=ApiResponse[SalesForecastData],
+)
+def get_sales_forecast(
+    product_id: uuid.UUID,
+    db: DbSession,
+    _: CurrentUser,
+    window: int = Query(
+        default=7,
+        ge=2,
+        le=30,
+        description="移动平均窗口（天）",
+    ),
+    horizon_days: int = Query(
+        default=7,
+        ge=1,
+        le=30,
+        description="预测未来天数",
+    ),
+    lookback_days: int = Query(
+        default=28,
+        ge=7,
+        le=90,
+        description="历史回看天数",
+    ),
+    sync_inventory: bool = Query(
+        default=True,
+        description="是否回填 InventorySnapshots.estimated_daily_sales",
+    ),
+) -> ApiResponse[SalesForecastData]:
+    """
+    简单销量预测（移动平均法）。
+
+    返回历史日销、未来 N 天预测（含置信度）与一句话建议；
+    默认将预估日销回填库存快照，供库存预警计算可售天数。
+    """
+    service = SalesForecastService(db)
+    try:
+        data = service.forecast(
+            product_id,
+            window=window,
+            horizon_days=horizon_days,
+            lookback_days=lookback_days,
+            sync_inventory=sync_inventory,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return ApiResponse(data=data)

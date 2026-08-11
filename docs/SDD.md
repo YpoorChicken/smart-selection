@@ -399,16 +399,22 @@ system_settings（KV 配置，如降价阈值）
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | UUID | PK | |
-| product_id | UUID | FK → products.id | |
+| product_id | UUID | FK → products.id | 索引 `(product_id, recorded_at DESC)` |
 | sku | VARCHAR(64) | | |
-| quantity | INT | NOT NULL | |
-| reorder_point | INT | | 预警阈值 |
-| predicted_daily_sales | Numeric(10,2) | | 销量预测 |
-| days_of_cover | Numeric(8,2) | | 可售天数 |
-| risk_level | ENUM | | `normal` / `watch` / `critical` |
+| quantity | INT | NOT NULL | 可用库存 |
+| safety_stock | INT | NOT NULL | 安全库存（原设计稿 `reorder_point`） |
+| predicted_daily_sales | Numeric(10,2) | | 预估日销（业务别名 `estimated_daily_sales`；由销量预测 API 回填） |
+| days_of_cover | Numeric(8,2) | | 可售天数 = quantity / predicted_daily_sales |
+| risk_level | ENUM | NOT NULL · 索引 | `normal` / `watch` / `critical` |
 | recorded_at | TIMESTAMPTZ | NOT NULL | |
+| created_at / updated_at | TIMESTAMPTZ | NOT NULL | |
 
-**用途：** `/inventory-alerts`「库存风险」Tab；P1 Should 库存摘要。
+**告警规则（模拟）：**
+- `quantity < safety_stock` → `risk_level=critical`，写 `alerts`（`type=inventory_low`，`severity=critical`，业务 high）
+- `quantity < safety_stock * 2` → `risk_level=watch`，写 `alerts`（`severity=warning`，业务 medium）
+- 否则 `normal`；同商品同 severity 24h 内去重
+
+**用途：** `/inventory-alerts`「库存风险」Tab；P1 Should 库存摘要。MVP 数据源为模拟快照（空库自动 seed）。
 
 ---
 
@@ -569,7 +575,23 @@ workers ──► services（复用同一领域逻辑）
 |------|------|------|------|
 | GET | `/products` | 列表：搜索、品类、排序、分页；含所属品类 | 运营+ |
 | GET | `/products/{id}` | 详情 + 可选历史价/排名 | 运营+ |
+| GET | `/products/{id}/history` | 商品历史时序（价格/评分/评论/BSR） | 运营+ |
+| GET | `/products/{id}/sales-forecast` | 移动平均销量预测（默认未来 7 天）；回填库存预估日销 | 全角色读 |
 | PATCH | `/products/{id}/watch` | 标记/取消自营关注 | 运营 |
+
+#### `GET /products/{id}/sales-forecast` 响应约定
+
+简单移动平均法（`method=moving_average`）。历史日销优先取 `product_histories.review_count` 日增量代理；样本不足时用可复现模拟序列。
+
+| 字段 | 说明 |
+|------|------|
+| `history` | 历史日销序列（`date` + `units`） |
+| `forecast` | 未来 N 天预测（`date` + `units` + 点级 `confidence`） |
+| `estimated_daily_sales` | 窗口均值预估日销；同步写入 `inventory_snapshots.predicted_daily_sales` |
+| `confidence` | 整体置信度 0–1（样本充足度 + 波动 CV） |
+| `suggestion` | 一句话补货建议（结合可售天数） |
+| `inventory_updated` | 是否已回填库存快照并重算 `days_of_cover` / `risk_level` |
+| 查询参数 | `window`（默认 7）· `horizon_days`（默认 7）· `lookback_days`（默认 28）· `sync_inventory`（默认 true） |
 | GET | `/categories` | 品类树（可筛 watched） | 运营+ |
 | GET | `/collection-tasks` | 采集任务列表与状态 | 运营读 / 主管写 |
 | POST | `/collection-tasks` | 创建采集任务 | ops_lead |
@@ -788,14 +810,46 @@ workers ──► services（复用同一领域逻辑）
 
 | 方法 | 路径 | 说明 | 角色 |
 |------|------|------|------|
-| GET | `/dashboard/summary` | KPI：趋势摘要、选品进度、竞品动态数、未读告警；默认近 7 天 | 全角色读 |
+| GET | `/dashboard/overview` | 综合运营看板：商品总数、监控品类数、待审推荐数、今日告警数、最快增长品类、蓝海品类、一句话摘要；可筛 `platform_id` / `days` | 全角色读 |
+| GET | `/dashboard/summary` | KPI：趋势摘要、选品进度、竞品动态数、未读告警；默认近 7 天（规划中，首页优先用 overview） | 全角色读 |
 | GET | `/dashboard/market-overview` | 市场概览聚合：品类总数、商品总数、最快增长品类、最竞争品类、价格趋势、季节性洞察；可筛 `platform_id` / `days` | 全角色读 |
 | GET | `/dashboard/competition` | 竞品监控看板：监控总数、今日告警、今日价格变动、Top 变动、一句话摘要 | 全角色读 |
-| GET | `/dashboard/category-growth` | 品类增长率 Top N | 全角色读 |
-| GET | `/inventory/risks` | 库存风险列表 | 运营+ |
-| GET | `/inventory/summary` | 库存预警摘要（P1 Should） | 全角色读 |
+| GET | `/dashboard/category-growth` | 品类增长率 Top N（看板柱状图；可筛 `platform_id` / `days` / `limit`，默认 limit=6） | 全角色读 |
+| GET | `/dashboard/price-trend` | 近 N 日自营均价 vs 竞品均价（看板折线图；`days` 默认 7） | 全角色读 |
+| GET | `/inventory` | 库存列表（每商品最新快照，分页；可筛 risk_level / keyword；空库自动模拟 seed） | 全角色读 |
+| GET | `/inventory/risks` | 库存风险列表（仅 watch / critical） | 运营+ |
+| GET | `/inventory/alerts` | 库存告警列表（`alerts.type=inventory_low`） | 全角色读 |
+| GET | `/inventory/summary` | 库存预警摘要：总数 / critical / watch / 未读库存告警 | 全角色读 |
+| PUT | `/inventory/{product_id}` | 更新库存（写入新快照并按规则触发告警） | 运营 |
+| POST | `/inventory/seed-mock` | 手动生成模拟库存（已有则跳过） | 运营 |
+| POST | `/inventory/check` | 重算风险并补齐库存告警 | 运营 |
 | GET | `/health` | 存活探测（Docker） | 公开 |
 | GET | `/ready` | 依赖就绪（DB/Redis） | 公开 |
+
+#### `GET /inventory` / `PUT /inventory/{product_id}` 约定
+
+| 字段 | 说明 |
+|------|------|
+| `quantity` | 可用库存 |
+| `safety_stock` | 安全库存阈值 |
+| `risk_level` | `critical`（库存 < 安全库存）/ `watch`（库存 < 2×安全库存）/ `normal` |
+| `days_of_cover` | 可售天数；无日销预测时为 `null` |
+| `alert_created` | 更新接口：是否新写入 `inventory_low` 告警 |
+
+#### `GET /dashboard/overview` 响应约定
+
+综合运营看板首页主接口（时区按服务端 UTC「今日」起算；`days` 默认 30，用于最快增长品类时间窗）。
+
+| 字段 | 说明 |
+|------|------|
+| `product_total` | 商品总数（可按平台过滤） |
+| `watched_category_count` | 监控品类数：`categories.is_watched = true` |
+| `pending_recommendation_count` | 待审推荐数：`recommendations.status = pending` |
+| `today_alert_count` | 今日告警数（全类型，`triggered_at` ≥ 当日 00:00 UTC） |
+| `fastest_growing_category` | 时间窗内最新月度 `growth_rate` 最高的品类；无趋势数据时为 `null` |
+| `blue_ocean_category` | 蓝海品类摘要：优先 pending 且需求/竞争机会分 ≥ 60 的最高 `score_total`；逐级回退；无推荐时为 `null` |
+| `summary` | 一句话运营摘要（服务端规则拼接，非 LLM） |
+| `generated_at` | 服务端聚合时间（UTC） |
 
 #### `GET /dashboard/market-overview` 响应约定
 
@@ -808,6 +862,22 @@ workers ──► services（复用同一领域逻辑）
 | `price_trend` | 近 12 个月全市场月均价曲线（优先 `category_trends`，回退 `product_histories`） |
 | `seasonality_insights` | 具备明确季节性提示的品类列表（过滤“数据不足/无明显季节性”） |
 | `generated_at` | 服务端聚合时间（UTC） |
+
+#### `GET /dashboard/category-growth` 响应约定
+
+| 字段 | 说明 |
+|------|------|
+| `items` | 时间窗内各品类最新月度趋势，按 `growth_rate` 降序 Top N |
+| `days` / `limit` | 请求时间窗与条数 |
+| `generated_at` | 聚合时间（UTC） |
+
+#### `GET /dashboard/price-trend` 响应约定
+
+| 字段 | 说明 |
+|------|------|
+| `days` | 序列长度（默认 7） |
+| `points[]` | 按日：`date` / `own_avg_price`（`product_histories` 日均）/ `competitor_avg_price`（活跃绑定快照日均）；无数据日为 `null` |
+| `generated_at` | 聚合时间（UTC） |
 
 #### `GET /dashboard/competition` 响应约定
 
@@ -826,13 +896,13 @@ workers ──► services（复用同一领域逻辑）
 
 | 页面 | 主要 API |
 |------|----------|
-| `/` Dashboard | `GET /dashboard/market-overview` · `GET /dashboard/competition` · `GET /dashboard/*` · `GET /alerts/unread-count` · `GET /recommendations/stats` |
+| `/` Dashboard | `GET /dashboard/overview` · `GET /dashboard/category-growth` · `GET /dashboard/price-trend`（辅：`market-overview` / `competition`） |
 | `/products` | `GET /products` · `GET/POST /collection-tasks*` |
 | `/trends` | `GET /trends` · `GET /trends/{id}/insight` |
 | `/recommendations` | `GET /recommendations` · `/export` · `/stats` · `/blue-ocean` · `POST /generate` · `/scan` · `/{id}` · accept/reject · ai-analysis |
 | `/competitors` | `GET/POST/DELETE /competitors*` · `GET /competitors/{product_id}/report` · `GET /dashboard/competition` |
 | `/listing` | `POST /listing/optimize/{id}` · `GET /listing/{id}/current` · `GET /listing/{id}/versions` · `POST .../adopt` · `GET .../compare` · `POST /listing/batch-optimize` · `POST /listing/ab-test/create` · `PUT .../complete` · `GET .../history` |
-| `/inventory-alerts` | `GET /alerts` · `POST /alerts/{id}/read` · `GET /inventory/risks` |
+| `/inventory-alerts` | `GET /inventory` · `GET /inventory/risks` · `GET /inventory/alerts` · `GET /inventory/summary` · `PUT /inventory/{product_id}` · `GET /alerts` · `POST /alerts/{id}/read` |
 
 ---
 
@@ -942,20 +1012,22 @@ workers ──► services（复用同一领域逻辑）
 
 ```
 [Browser GET /]
-    │  并行：
-    │    GET /dashboard/summary?range=7d&platform=amazon
+    │  主请求：
+    │    GET /dashboard/overview?platform_id=&days=30
+    │  可选并行：
     │    GET /dashboard/category-growth
     │    GET /alerts/unread-count
     ▼
-[DashboardService]
-    │  recommendations GROUP BY status
-    │  alerts COUNT unread
-    │  competitor_snapshots 近 24h 变价次数
+[DashboardService.get_overview]
+    │  products COUNT
+    │  categories COUNT WHERE is_watched
+    │  recommendations COUNT WHERE pending
+    │  alerts COUNT WHERE triggered_at ≥ today
     │  category_trends 近窗 Top 增长
-    │  （Should）inventory 风险摘要
-    │  Redis GET/SET dashboard:summary:{user}:{range} TTL 60s
+    │  recommendations 蓝海 Top1（门槛同 blue-ocean）
+    │  规则拼接 summary
     ▼
-  < 2s 可交互目标：缓存命中 + 聚合索引；冷启动采集不计入 SLA
+  < 2s 可交互目标：聚合索引；冷启动采集不计入 SLA
 ```
 
 ### 4.6 AI 趋势解读（P3）
@@ -1028,14 +1100,26 @@ AI 选品深度分析由 `POST /recommendations/{id}/ai-analysis` 同步触发�
 
 ```
 services:
-  api          # FastAPI uvicorn
-  worker       # ARQ worker（含 Cron 日批选品扫描）
-  db           # PostgreSQL
-  redis        # Redis
-  web          # Nginx + Vue 静态（可选同栈）
+  api          # FastAPI uvicorn（Dockerfile 多阶段）
+  worker       # ARQ worker（复用 api 镜像，含 Cron 日批选品扫描）
+  db           # PostgreSQL 15（volume: hpzx_pgdata）
+  redis        # Redis 7（volume: hpzx_redisdata）
+  frontend     # Nginx + Vue 静态；/api → api:8000
 ```
 
-`/health`、`/ready` 供编排探针；一键 `docker compose up`。
+**编排文件：** 根目录 `Dockerfile` · `docker-compose.yml` · `.env`（参考 `.env.example`）· `frontend/Dockerfile` · `frontend/nginx.conf`。
+
+**探针：**
+- `GET /api/v1/health` — 进程存活
+- `GET /api/v1/ready` — DB + Redis 就绪（503 表示未就绪）
+
+**一键启动：**
+
+```bash
+cp .env.example .env   # 修改 SECRET_KEY / POSTGRES_PASSWORD
+docker compose up -d --build
+# 前端 http://localhost  · API http://localhost:8000/api/v1/health
+```
 
 ### 5.5 设计签收遗留对实现的约束
 

@@ -23,6 +23,9 @@
 - [x] AppShell 全局布局（240px 深色侧栏 + 56px 顶栏 + 内容区白卡片）
 - [x] 登录/注册页（居中卡片 + Tab）+ axios 拦截器 + 路由守卫
 - [x] 七个业务页占位路由：看板 / 商品 / 趋势 / 选品 / 竞品 / Listing / 库存
+- [x] **运营看板首页**（`Dashboard.vue`）：四 KPI（商品总数/监控品类/待审推荐/今日告警）+ Top 品类增长率柱状图 + 近 7 天价格折线 + 最快增长/蓝海高亮卡 + AI 摘要；骨架→淡入、hover 上浮；对接 `/dashboard/overview` · `category-growth` · `price-trend`
+- [x] **库存预警页**（`Inventory.vue`）：统计条（总数/告警/预警）+ 风险表格（状态色行）+ 行内更新库存；对接 `/inventory` · `/summary` · `PUT /{product_id}`；三态齐全
+- [x] 前端收尾：`PageHeader` / `EmptyState` / `NotFoundView`(404) + AppShell 面包屑旁页面名；主表 `table-scroll` 小屏横向滚动
 - [x] `ScoreRing.vue` — 蓝海指数圆环（对齐 COMPONENT-SPEC）
 - [x] `ProductScoreCard.vue` — 商品评分卡片（商品名 / 价格 / 评分 / 蓝海指数）
 - [x] **商品管理页**（`ProductsView.vue`）：按 `02-products-collection.png` 完成层级品类树（父类含子类商品、递归商品数、过滤 / 跨平台近义合并）、商品表（所属品类 / 最近同步 / 搜索 / 平台 / 排序 / 分页）、采集配置抽屉、同步操作与价格历史 ECharts 弹窗；三态齐全
@@ -37,6 +40,7 @@
 - [x] CORS、统一异常响应、请求/脱敏 SQL 日志、登录防爆破
 - [x] Swagger 登录持久化、`/health` 与 `/ready` 探针
 - [x] 数据源接入层（`DataSource` 抽象 + Mock / FakeStore + 工厂切换）
+- [x] DummyJSON 数据源（免费联调推荐；含 `stock`；`DATA_SOURCE=dummyjson`；旧 `fakestore` 配置映射到 DummyJSON）
 - [x] Amazon SP-API 数据源（LWA Token 缓存 + Catalog Items；缺凭据回落 Mock）
 - [x] Shopee Open Platform 数据源（HMAC 签名 + Token 4h 缓存 + 商品归一化；缺凭据回落 Mock）
 - [x] 登录认证整合 Redis（远程 `192.168.200.180:6379`：防爆破计数/锁定 + 会话用户缓存）
@@ -47,6 +51,10 @@
 - [x] 价格分布分析 API：`GET /api/v1/trends/categories/{id}/charts/price-distribution`（四分位区间商品数 / 平均评分 / 月度价格曲线 / 分析建议，父品类含全部子类）
 - [x] 品类趋势 AI 报告：`POST /api/v1/trends/categories/{id}/ai-report`（趋势计算 + 价格分布聚合 + 千问/OpenAI 兼容 LLM，Pydantic 约束摘要 / 亮点 / 推荐 / 风险并缓存至 `ai_insight`）
 - [x] 市场概览看板：`GET /api/v1/dashboard/market-overview`（品类/商品总数、最快增长、最竞争、价格趋势、季节性洞察；已同步 `docs/SDD.md` §3.6）
+- [x] 综合运营看板：`GET /api/v1/dashboard/overview`（商品总数、监控品类数、待审推荐数、今日告警数、最快增长、蓝海品类、一句话摘要；已回写 SDD / DD-027）
+- [x] 看板图表接口：`GET /dashboard/category-growth` + `GET /dashboard/price-trend`（首页柱状/折线；已回写 SDD / DD-030）
+- [x] 库存预警（模拟）：`InventorySnapshot` + `GET /inventory` · `/risks` · `/alerts` · `/summary` · `PUT /inventory/{product_id}`；规则 quantity<safety→critical、<2×safety→watch；空库自动 seed；已回写 SDD / DD-028
+- [x] 销量预测：`GET /products/{id}/sales-forecast`（移动平均未来 7 天；历史/预测/置信度/一句话建议；回填 `InventorySnapshots.predicted_daily_sales`≈estimated_daily_sales）；已回写 SDD / DD-029
 - [x] 选品推荐数据模型：`Recommendation` / `recommendations`（严格对齐 SDD §1.2.8；含四维得分、决策字段、`(status, score_total DESC)` / `category_id` 索引、`RecommendationStatus` 状态机；决策字段内嵌不单建 selection_decisions）
 - [x] 选品评分算法：`SelectionScorer`（需求 30% / 竞争 20% / 利润 25% / 趋势 25%）+ `POST /api/v1/recommendations/generate`；已回写 `docs/SDD.md` §3.3 / §4.7
 - [x] 蓝海品类发现：`GET /api/v1/recommendations/blue-ocean`（需求高×竞争低筛选，蓝海指数降序，含四维评分与推荐理由；已写入 SDD §3.3）
@@ -67,6 +75,8 @@
 - [x] Listing 批量优化：`ListingBatchOptimizeService` + API `POST /listing/batch-optimize`、`GET /listing/batch-optimize/{task_id}`；BackgroundTasks 逐个执行，单项失败不中断；进度 Redis/内存；已回写 SDD / DD-026
 - [x] Listing 版本 API：`GET /listing/{id}/current|versions|compare`、`POST .../versions/{id}/adopt`
 - [x] Listing 优化页（`Listing.vue`）：商品选择器 + 双栏对比（原版/AI 优化版）+ 关键词增删高亮 + 优化理由 + 版本时间线回滚 + A/B 胜出入口；对接 optimize / versions / adopt / ab-test
+- [x] Docker 部署：根目录多阶段 `Dockerfile`（api/worker）+ `frontend/Dockerfile`（nginx）+ `docker-compose.yml`（api/db/redis/worker/frontend）+ `.env.example` + healthcheck；已回写 SDD §5.4
+- [x] 项目 README.md（简介/架构图/六模块/五步启动/API 文档/原型截图）+ CLAUDE.md 完整信息补充
 - [ ] 为本轮模型生成 Alembic 初始迁移（进入生产部署前）
 
 

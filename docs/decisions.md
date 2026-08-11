@@ -333,6 +333,54 @@ SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:
 
 ---
 
+## DD-027 · 综合运营看板 overview 聚合接口
+
+**决策：**  
+首页综合 KPI 使用 `GET /dashboard/overview`（非未实现的 `summary`）。字段固定为：商品总数、监控品类数（`is_watched`）、待审推荐数、今日告警数（全类型 UTC 今日）、最快增长品类、蓝海品类 Top1、规则拼接一句话摘要。蓝海优先读已落库推荐（门槛同 blue-ocean），避免每次全量打分。
+
+**理由：**  
+看板首屏需一次请求拿到决策摘要；与 `market-overview`（市场曲线）/`competition`（竞品盯盘）分工清晰。
+
+**状态：** 已采纳（2026-08-11，已回写 `docs/SDD.md` §3.6 / §4.5）
+
+---
+
+## DD-028 · 库存预警模拟快照与安全库存规则
+
+**决策：**  
+`inventory_snapshots` 使用 `safety_stock`（替代设计稿 `reorder_point` 命名）。规则：`quantity < safety_stock` → critical/high；`< 2×safety_stock` → watch/medium；否则 normal。更新库存写入新快照并落 `alerts.type=inventory_low`（24h 同 severity 去重）。MVP 无真实仓储对接，空库自动生成模拟快照。
+
+**理由：**  
+与原型「安全库存」用语一致；先闭环列表/风险/告警/更新，便于库存预警页联调。
+
+**状态：** 已采纳（2026-08-11，已回写 `docs/SDD.md` §1.2.13 / §3.6）
+
+---
+
+## DD-029 · 销量预测用移动平均并回填库存日销
+
+**决策：**  
+`GET /products/{id}/sales-forecast` 采用简单移动平均（默认窗口 7、预测未来 7 天）。历史日销优先用评论增量代理，不足则模拟。响应含历史序列、预测点（含置信度）、一句话建议；预估日销回填 `inventory_snapshots.predicted_daily_sales`（业务别名 `estimated_daily_sales`）并重算可售天数/风险，形成「预测 → 补货」闭环。
+
+**理由：**  
+无平台真实订单时先用可解释统计方法；与库存预警共用日销字段，避免两套口径。
+
+**状态：** 已采纳（2026-08-11，已回写 `docs/SDD.md` §3.1 / §1.2.13）
+
+---
+
+## DD-030 · 运营看板首页对接 overview + 图表专用接口
+
+**决策：**  
+首页 `/`（`Dashboard.vue`）KPI / 最快增长 / 蓝海 / AI 摘要统一走 `GET /dashboard/overview`；柱状图走 `GET /dashboard/category-growth`；折线图走 `GET /dashboard/price-trend`（近 7 日自营历史均价 vs 活跃竞品快照均价）。AppShell 不改版。
+
+**理由：**  
+overview 已覆盖四卡片与底部洞察；图表需要序列数据，单独接口避免把重量级序列塞进 overview，并与原型「Top 增长率 / 近 7 天价格」对齐。
+
+**状态：** 已采纳（2026-08-11，已回写 `docs/SDD.md` §3.6 / §3.7）
+
+---
+
 ## 变更日志
 
 | 日期 | 说明 |
@@ -352,3 +400,7 @@ SDD 状态机与接受/拒绝事务均围绕单行 `UPDATE`；拆表会引入 1:
 | 2026-08-10 | 新增 DD-024：Listing AI 优化 API 与版本落库 |
 | 2026-08-10 | 新增 DD-025：Listing A/B 测试模型与 API |
 | 2026-08-10 | 新增 DD-026：Listing 批量优化与进度查询 |
+| 2026-08-11 | 新增 DD-027：综合运营看板 overview API |
+| 2026-08-11 | 新增 DD-028：库存预警模拟快照与安全库存规则 |
+| 2026-08-11 | 新增 DD-029：销量预测移动平均与库存日销回填 |
+| 2026-08-11 | 新增 DD-030：运营看板首页 overview + category-growth + price-trend |

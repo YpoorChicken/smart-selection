@@ -104,3 +104,21 @@ a:hover {
   color: var(--color-ink-muted);
   font-size: 14px;
 }
+
+/* 表格小屏横向滚动，避免挤压卡片 */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll .el-table {
+  min-width: 720px;
+}
+
+@media (max-width: 768px) {
+  .table-scroll .el-table {
+    min-width: 860px;
+  }
+}
+

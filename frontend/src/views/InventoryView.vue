@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import PagePlaceholder from '@/components/PagePlaceholder.vue'
+/** 兼容路由；页面实现见 Inventory.vue */
+import Inventory from './Inventory.vue'
 </script>
 
 <template>
-  <PagePlaceholder
-    title="库存预警"
-    description="库存风险列表与告警处理将在此落地。"
-  />
+  <Inventory />
 </template>

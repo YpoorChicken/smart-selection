@@ -18,12 +18,13 @@ class Platform(str, enum.Enum):
     """
     电商平台 / 数据源标识。
 
-    amazon / shopee 为生产平台；mock / fakestore 供开发联调入库。
+    amazon / shopee 为生产平台；mock / dummyjson / fakestore 供开发联调入库。
     """
 
     amazon = "amazon"
     shopee = "shopee"
     mock = "mock"
+    dummyjson = "dummyjson"
     fakestore = "fakestore"
 
 
@@ -143,3 +144,11 @@ class BatchOptimizeItemStatus(str, enum.Enum):
     running = "running"
     success = "success"
     failed = "failed"
+
+
+class InventoryRisk(str, enum.Enum):
+    """库存风险等级（SDD 附录 A / §1.2.13）。"""
+
+    normal = "normal"
+    watch = "watch"
+    critical = "critical"

@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:5174"
 
     # —— 数据源接入层 ——
-    # mock（默认）| fakestore | amazon | shopee
+    # mock（默认）| dummyjson | fakestore(兼容→DummyJSON) | amazon | shopee
     data_source: str = "mock"
 
     # Amazon SP-API（LWA）：对应 Client ID / Client Secret / Refresh Token

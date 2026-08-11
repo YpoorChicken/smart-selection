@@ -48,6 +48,7 @@ const PLATFORM_OPTIONS: { label: string; value: PlatformId }[] = [
   { label: 'Amazon', value: 'amazon' },
   { label: 'Shopee', value: 'shopee' },
   { label: 'Mock', value: 'mock' },
+  { label: 'DummyJSON', value: 'dummyjson' },
   { label: 'FakeStore', value: 'fakestore' },
 ]
 
@@ -58,8 +59,8 @@ const DAYS_OPTIONS = [
 ]
 
 const router = useRouter()
-/** 与当前 .env DATA_SOURCE=fakestore 对齐；可在筛选中切换 */
-const platformId = ref<PlatformId>('fakestore')
+/** 与当前 .env DATA_SOURCE=dummyjson 对齐；可在筛选中切换 */
+const platformId = ref<PlatformId>('dummyjson')
 const days = ref(365)
 const bootstrapping = ref(false)
 
@@ -849,9 +850,12 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   padding: 0 8px 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-wrap :deep(.el-table) {
+  min-width: 520px;
   --el-table-header-bg-color: var(--color-surface-sunken);
   --el-table-row-hover-bg-color: var(--color-primary-subtle);
   --el-table-current-row-bg-color: #eef2ff;

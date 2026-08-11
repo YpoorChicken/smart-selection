@@ -72,6 +72,7 @@ const platformLabel: Record<string, string> = {
   amazon: 'Amazon',
   shopee: 'Shopee',
   mock: 'Mock',
+  dummyjson: 'DummyJSON',
   fakestore: 'FakeStore',
 }
 

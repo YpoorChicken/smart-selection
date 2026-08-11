@@ -34,6 +34,7 @@ type LoadState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
 
 const PLATFORM_OPTIONS: { label: string; value: PlatformId | '' }[] = [
   { label: '全部平台', value: '' },
+  { label: 'DummyJSON', value: 'dummyjson' },
   { label: 'FakeStore', value: 'fakestore' },
   { label: 'Amazon', value: 'amazon' },
   { label: 'Shopee', value: 'shopee' },
@@ -174,6 +175,7 @@ function platformLabel(platform: PlatformId | string | null | undefined): string
   const map: Record<string, string> = {
     amazon: 'Amazon',
     shopee: 'Shopee',
+    dummyjson: 'DummyJSON',
     fakestore: 'FakeStore',
     mock: 'Mock',
   }
@@ -820,8 +822,8 @@ onMounted(async () => {
         {{ activeTab === 'accepted' ? '暂无已接受选品' : '暂无推荐记录' }}
       </div>
 
+      <div v-else class="table-scroll">
       <el-table
-        v-else
         :data="listItems"
         stripe
         class="rec-table"
@@ -871,6 +873,7 @@ onMounted(async () => {
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <div v-if="listTotal > 0" class="pager">
         <el-pagination

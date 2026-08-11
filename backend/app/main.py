@@ -20,6 +20,7 @@ from app.routers import (
     categories,
     competitors,
     dashboard,
+    inventory,
     listing,
     products,
     recommendations,
@@ -155,5 +156,6 @@ app.include_router(recommendations.router, prefix="/api/v1")
 app.include_router(competitors.router, prefix="/api/v1")
 app.include_router(listing.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
+app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(system.router, prefix="/api/v1")

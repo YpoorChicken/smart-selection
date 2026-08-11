@@ -31,7 +31,7 @@ class DataSource(ABC):
     @property
     @abstractmethod
     def platform(self) -> str:
-        """数据源标识：mock / fakestore / amazon / shopee。"""
+        """数据源标识：mock / dummyjson / fakestore / amazon / shopee。"""
 
     @abstractmethod
     def get_categories(self) -> list[dict[str, Any]]:

@@ -20,7 +20,9 @@ def health() -> ApiResponse[dict[str, str]]:
 
 @router.get("/ready", response_model=ApiResponse[dict[str, str]])
 def ready(db: DbSession) -> ApiResponse[dict[str, str]]:
-    """数据库就绪探针；依赖不可用时返回 503。"""
+    """数据库 + Redis 就绪探针；任一依赖不可用时返回 503。"""
+    from app.utils.redis_client import ping_redis
+
     try:
         db.execute(text("SELECT 1"))
     except SQLAlchemyError as exc:
@@ -28,5 +30,13 @@ def ready(db: DbSession) -> ApiResponse[dict[str, str]]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="数据库未就绪",
         ) from exc
-    return ApiResponse(data={"status": "ready", "database": "ok"})
 
+    if not ping_redis():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Redis 未就绪",
+        )
+
+    return ApiResponse(
+        data={"status": "ready", "database": "ok", "redis": "ok"},
+    )

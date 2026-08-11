@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from app.models.alert import Alert
     from app.models.category import Category
     from app.models.competitor_binding import CompetitorBinding
+    from app.models.inventory_snapshot import InventorySnapshot
     from app.models.listing_ab_test import ListingABTest
     from app.models.listing_version import ListingVersion
     from app.models.product_history import ProductHistory
@@ -160,4 +161,11 @@ class Product(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="ListingABTest.started_at.desc()",
+    )
+    inventory_snapshots: Mapped[list[InventorySnapshot]] = relationship(
+        "InventorySnapshot",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="InventorySnapshot.recorded_at.desc()",
     )

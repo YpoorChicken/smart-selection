@@ -56,11 +56,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/InventoryView.vue'),
         meta: { title: '库存预警', breadcrumb: ['库存预警'] },
       },
+      {
+        path: '404',
+        name: 'not-found',
+        component: () => import('@/views/NotFoundView.vue'),
+        meta: { title: '页面不存在', breadcrumb: ['404'] },
+      },
     ],
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/',
+    name: 'catch-all',
+    redirect: '/404',
   },
 ]
 

@@ -90,3 +90,70 @@ class CompetitionDashboardData(BaseModel):
     top_changes: list[CompetitionTopChangeItem] = Field(default_factory=list)
     summary: str = Field(description="一句话运营摘要")
     generated_at: datetime
+
+
+class OverviewBlueOceanCategory(BaseModel):
+    """综合看板中的蓝海品类摘要（取蓝海指数最高的一条）。"""
+
+    category_id: uuid.UUID
+    category_name: str
+    platform_id: Platform
+    blue_ocean_index: Decimal = Field(description="蓝海指数 = score_total（0–100）")
+    score_demand: Decimal
+    score_competition: Decimal
+    score_margin: Decimal
+    score_trend: Decimal
+    reason: str | None = None
+    recommendation_id: uuid.UUID | None = None
+    avg_price: Decimal | None = None
+    growth_rate: Decimal | None = None
+
+
+class DashboardOverviewData(BaseModel):
+    """综合运营看板聚合数据。"""
+
+    product_total: int = Field(ge=0, description="商品总数")
+    watched_category_count: int = Field(ge=0, description="监控品类数（is_watched=true）")
+    pending_recommendation_count: int = Field(ge=0, description="待审推荐数")
+    today_alert_count: int = Field(ge=0, description="今日告警数（全类型）")
+    fastest_growing_category: FastestGrowingCategory | None
+    blue_ocean_category: OverviewBlueOceanCategory | None
+    summary: str = Field(description="一句话运营摘要（服务端规则拼接）")
+    generated_at: datetime
+
+
+class CategoryGrowthItem(BaseModel):
+    """品类增长率 Top 条目（看板柱状图）。"""
+
+    category_id: uuid.UUID
+    category_name: str
+    platform_id: Platform
+    growth_rate: Decimal | None = None
+    average_price: Decimal | None = None
+    sample_size: int | None = None
+    period_month: date
+
+
+class CategoryGrowthData(BaseModel):
+    """品类增长率 Top N。"""
+
+    items: list[CategoryGrowthItem] = Field(default_factory=list)
+    days: int = Field(ge=1)
+    limit: int = Field(ge=1)
+    generated_at: datetime
+
+
+class DailyPriceTrendPoint(BaseModel):
+    """近 N 日自营/竞品均价点。"""
+
+    date: date
+    own_avg_price: Decimal | None = None
+    competitor_avg_price: Decimal | None = None
+
+
+class DailyPriceTrendData(BaseModel):
+    """今日/近 N 日价格变动趋势（看板折线图）。"""
+
+    days: int = Field(ge=1)
+    points: list[DailyPriceTrendPoint] = Field(default_factory=list)
+    generated_at: datetime

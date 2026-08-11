@@ -64,6 +64,7 @@ const PLATFORM_OPTIONS: { label: string; value: PlatformFilter }[] = [
   { label: 'Amazon', value: 'amazon' },
   { label: 'Shopee', value: 'shopee' },
   { label: 'Mock', value: 'mock' },
+  { label: 'DummyJSON', value: 'dummyjson' },
   { label: 'FakeStore', value: 'fakestore' },
 ]
 
@@ -242,6 +243,7 @@ function ratingTone(rating: number | null): 'high' | 'mid' | 'low' | 'none' {
 function platformLabel(platform: PlatformId): string {
   if (platform === 'amazon') return 'Amazon'
   if (platform === 'shopee') return 'Shopee'
+  if (platform === 'dummyjson') return 'DummyJSON'
   if (platform === 'fakestore') return 'FakeStore'
   return 'Mock'
 }
@@ -1069,6 +1071,7 @@ onBeforeUnmount(() => {
           <el-option label="Amazon" value="amazon" />
           <el-option label="Shopee" value="shopee" />
           <el-option label="Mock" value="mock" />
+          <el-option label="DummyJSON" value="dummyjson" />
           <el-option label="FakeStore" value="fakestore" />
         </el-select>
 
@@ -1489,14 +1492,17 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap .product-table {
+  min-width: 860px;
+  flex: 1;
 }
 
 .table-skeleton {
   padding: 16px;
-}
-
-.product-table {
-  flex: 1;
 }
 
 .product-table :deep(.el-table__header th) {

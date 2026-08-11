@@ -13,7 +13,9 @@ from app.models.enums import Platform, SyncStatus, SyncType
 class SyncCategoriesRequest(BaseModel):
     """手动触发品类同步。"""
 
-    platform_id: Platform = Field(description="入库平台：amazon / shopee / mock / fakestore")
+    platform_id: Platform = Field(
+        description="入库平台：amazon / shopee / mock / dummyjson / fakestore"
+    )
 
 
 class SyncProductsRequest(BaseModel):

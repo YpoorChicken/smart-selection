@@ -1,4 +1,4 @@
-export type PlatformId = 'amazon' | 'shopee' | 'mock' | 'fakestore'
+export type PlatformId = 'amazon' | 'shopee' | 'mock' | 'dummyjson' | 'fakestore'
 
 export type NumericValue = number | string
 
