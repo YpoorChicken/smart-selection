@@ -22,6 +22,7 @@ def seed_initial_data() -> None:
     """
     幂等初始化 SDD 所需基础数据和测试管理员。
 
+    初始账号角色为 ops_lead（运营主管），便于演示竞品刷新、Listing 写操作等。
     管理员密码仅在首次创建时哈希入库；后续启动不会覆盖已修改密码。
     生产部署应在首次登录后立即修改此初始密码。
     """
@@ -40,7 +41,7 @@ def _ensure_admin(db: Session) -> None:
             email=ADMIN_EMAIL,
             password_hash=hash_password(ADMIN_INITIAL_PASSWORD),
             display_name="张运营",
-            role=UserRole.boss,
+            role=UserRole.ops_lead,
             is_active=True,
         )
     )

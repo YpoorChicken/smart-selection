@@ -586,21 +586,39 @@ onBeforeUnmount(() => {
         </el-tag>
       </div>
       <div class="toolbar-right">
-        <el-button
-          :icon="Refresh"
-          :loading="refreshing"
-          @click="handleRefresh"
+        <el-tooltip
+          :disabled="canWrite"
+          content="仅运营或运营主管可刷新竞品数据"
+          placement="top"
         >
-          刷新竞品数据
-        </el-button>
-        <el-button
-          type="primary"
-          :icon="Plus"
-          :loading="discovering"
-          @click="handleDiscover"
+          <span class="btn-wrap">
+            <el-button
+              :icon="Refresh"
+              :loading="refreshing"
+              :disabled="!canWrite"
+              @click="handleRefresh"
+            >
+              刷新竞品数据
+            </el-button>
+          </span>
+        </el-tooltip>
+        <el-tooltip
+          :disabled="canWrite"
+          content="仅运营或运营主管可添加竞品"
+          placement="top"
         >
-          添加竞品
-        </el-button>
+          <span class="btn-wrap">
+            <el-button
+              type="primary"
+              :icon="Plus"
+              :loading="discovering"
+              :disabled="!canWrite || !selectedProductId"
+              @click="handleDiscover"
+            >
+              添加竞品
+            </el-button>
+          </span>
+        </el-tooltip>
       </div>
     </section>
 
@@ -628,6 +646,7 @@ onBeforeUnmount(() => {
           link
           type="primary"
           :loading="markingId === bannerAlert.id"
+          :disabled="!canMarkRead"
           @click="handleMarkRead(bannerAlert)"
         >
           标记已读
@@ -825,14 +844,22 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <el-button
-            size="small"
-            :loading="markingId === item.id"
-            :disabled="item.is_read"
-            @click="handleMarkRead(item)"
+          <el-tooltip
+            :disabled="canMarkRead"
+            content="仅运营或运营主管可标记已读"
+            placement="top"
           >
-            标记已读
-          </el-button>
+            <span class="btn-wrap">
+              <el-button
+                size="small"
+                :loading="markingId === item.id"
+                :disabled="item.is_read || !canMarkRead"
+                @click="handleMarkRead(item)"
+              >
+                标记已读
+              </el-button>
+            </span>
+          </el-tooltip>
         </li>
       </ul>
     </section>
@@ -844,6 +871,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.btn-wrap {
+  display: inline-flex;
 }
 
 .card {

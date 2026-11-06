@@ -247,10 +247,11 @@ class SelectionScanService:
         self,
         platform_id: Platform | None,
     ) -> list[uuid.UUID]:
+        # PostgreSQL：SELECT DISTINCT id ... ORDER BY name 非法，需把 name 纳入分组
         stmt = (
             select(Category.id)
             .join(Product, Product.category_id == Category.id)
-            .distinct()
+            .group_by(Category.id, Category.name)
             .order_by(Category.name.asc())
         )
         if platform_id is not None:

@@ -388,10 +388,11 @@ class RecommendationService:
         platform_id: Platform | None,
     ) -> list[uuid.UUID]:
         """只返回至少有一个商品的品类，避免无效打分。"""
+        # PostgreSQL：SELECT DISTINCT id ... ORDER BY name 非法，需把 name 纳入分组
         stmt = (
             select(Category.id)
             .join(Product, Product.category_id == Category.id)
-            .distinct()
+            .group_by(Category.id, Category.name)
             .order_by(Category.name.asc())
         )
         if platform_id is not None:

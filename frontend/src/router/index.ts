@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { getStoredToken } from '@/api/request'
+import { useAuthStore } from '@/stores/auth'
 
 const AppShell = () => import('@/layouts/AppShell.vue')
 
@@ -76,7 +77,7 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const isPublic = Boolean(to.meta.public)
   const token = getStoredToken()
 
@@ -85,6 +86,11 @@ router.beforeEach((to) => {
       path: '/login',
       query: { redirect: to.fullPath },
     }
+  }
+
+  if (token) {
+    // 刷新页面后同步服务端角色，避免 localStorage 旧 role 误禁写操作
+    await useAuthStore().ensureSession()
   }
 
   if (to.path === '/login' && token) {

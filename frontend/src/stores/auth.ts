@@ -23,6 +23,9 @@ function readStoredUser(): UserInfo | null {
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(getStoredToken())
   const user = ref<UserInfo | null>(readStoredUser())
+  const sessionSynced = ref(false)
+  let syncAttempted = false
+  let syncing: Promise<void> | null = null
 
   const isAuthenticated = computed(() => Boolean(token.value))
   const displayName = computed(
@@ -47,6 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = result.access_token
     setStoredToken(result.access_token)
     persistUser(result.user)
+    sessionSynced.value = true
     return result
   }
 
@@ -56,6 +60,7 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = result.access_token
       setStoredToken(result.access_token)
       persistUser(result.user)
+      sessionSynced.value = true
       return result
     }
     persistUser(result as UserInfo)
@@ -65,31 +70,52 @@ export const useAuthStore = defineStore('auth', () => {
   async function hydrate() {
     if (!token.value) {
       persistUser(null)
+      sessionSynced.value = false
       return
     }
     try {
       const me = await fetchMeApi()
       persistUser(me)
-    } catch {
-      logout()
+      sessionSynced.value = true
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      // 仅鉴权失败时清会话；网络/5xx 保留本地用户，避免误登出
+      if (status === 401) {
+        logout()
+      }
     }
+  }
+
+  async function ensureSession() {
+    if (!token.value || sessionSynced.value || syncAttempted) return
+    if (!syncing) {
+      syncAttempted = true
+      syncing = hydrate().finally(() => {
+        syncing = null
+      })
+    }
+    await syncing
   }
 
   function logout() {
     token.value = null
     clearStoredToken()
     persistUser(null)
+    sessionSynced.value = false
+    syncAttempted = false
   }
 
   return {
     token,
     user,
+    sessionSynced,
     isAuthenticated,
     displayName,
     avatarText,
     login,
     register,
     hydrate,
+    ensureSession,
     logout,
   }
 })

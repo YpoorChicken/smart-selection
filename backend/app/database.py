@@ -149,6 +149,12 @@ def init_db() -> None:
     """创建全部表（开发骨架阶段；生产应走 Alembic 迁移）。"""
     # 确保模型已注册到 metadata
     from app import models  # noqa: F401
+    from sqlalchemy import text
+
+    # products.title 的 GIN 索引依赖 pg_trgm（见 models/product.py）
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
 
     Base.metadata.create_all(bind=engine)
     _ensure_sqlite_columns()
