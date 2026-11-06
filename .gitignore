@@ -16,6 +16,10 @@ venv/
 node_modules/
 frontend/dist/
 *.local
+frontend-tmp/
+
+# 根目录误生成的锁文件（真实锁文件在 frontend/）
+/package-lock.json
 
 # IDE / 系统
 .idea/
